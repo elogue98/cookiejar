@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import ImportRecipeModal from './ImportRecipeModal'
+import UserAvatar from './UserAvatar'
 
 interface Recipe {
   id: string
@@ -14,6 +15,12 @@ interface Recipe {
   instructions: string | null
   created_at: string | null
   cookbookSource: string | null
+  created_by?: string | null
+  creator?: {
+    id: string
+    name: string
+    avatar_url: string
+  } | null
 }
 
 interface RecipeListProps {
@@ -379,6 +386,22 @@ export default function RecipeList({ recipes }: RecipeListProps) {
                     <span style={{ fontSize: '32px' }}>🍪</span>
                   </div>
                 )}
+                {/* Creator Avatar in corner */}
+                {recipe.creator && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    zIndex: 10
+                  }}>
+                    <UserAvatar
+                      src={recipe.creator.avatar_url}
+                      alt={recipe.creator.name}
+                      name={recipe.creator.name}
+                      size="default"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Content */}
@@ -396,23 +419,6 @@ export default function RecipeList({ recipes }: RecipeListProps) {
                 }}>
                   {recipe.title}
                 </h3>
-
-                {/* Instructions snippet */}
-                {recipe.instructions && (
-                  <p style={{
-                    fontSize: '12px',
-                    color: 'rgba(43, 43, 43, 0.7)',
-                    marginBottom: '10px',
-                    lineHeight: '1.5',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden'
-                  }}>
-                    {recipe.instructions.split('\n')[0].substring(0, 80)}
-                    {recipe.instructions.split('\n')[0].length > 80 ? '...' : ''}
-                  </p>
-                )}
 
                 {/* Rating and Tags */}
                 <div style={{

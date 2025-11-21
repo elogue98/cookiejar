@@ -1,16 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Logo from '../components/Logo'
+import Navigation from '../components/Navigation'
+import { useUser } from '@/lib/userContext'
 
 export default function ImportPage() {
+  const router = useRouter()
+  const { user, isLoading } = useUser()
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const router = useRouter()
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, isLoading, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,7 +37,10 @@ export default function ImportPage() {
       const res = await fetch('/api/recipes/import-from-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ 
+          url: url.trim(),
+          userId: user?.id,
+        }),
       })
 
       const data = await res.json()
@@ -55,23 +67,7 @@ export default function ImportPage() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>
-      <header className="border-b" style={{ borderColor: 'rgba(211, 78, 78, 0.1)', background: '#F9E7B2' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3 text-3xl font-bold transition-colors" style={{ color: 'var(--text-main)' }}>
-              <Logo size={48} />
-              <span>Cookie Jar</span>
-            </Link>
-            <Link 
-              href="/" 
-              className="transition-colors"
-              style={{ color: 'var(--accent-clay)' }}
-            >
-              ← Back to Recipes
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Navigation />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <section className="max-w-2xl">
@@ -154,7 +150,7 @@ export default function ImportPage() {
           }}>
             <p className="text-sm leading-relaxed" style={{ color: 'var(--text-main)' }}>
               <strong>How it works:</strong> Paste a recipe URL from any cooking website. 
-              We'll automatically extract the recipe title, ingredients, and instructions and add it to your CookieJar.
+              We'll automatically extract the recipe title, ingredients, and instructions and add it to your Cookie Jar.
             </p>
           </div>
         </section>

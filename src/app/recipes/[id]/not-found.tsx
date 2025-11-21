@@ -6,7 +6,7 @@ export default function NotFound() {
       <header className="border-b border-[#B77466]/30 bg-[#E2B59A]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <Link href="/" className="text-3xl font-bold text-[#6B563F] hover:text-[#6B563F]/80 transition-colors cursor-pointer">
-            🍪 CookieJar
+            🍪 Cookie Jar
           </Link>
         </div>
       </header>

@@ -1898,7 +1898,7 @@ export async function parseRecipe(html: string, url: string): Promise<ParsedReci
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { url } = body
+    const { url, userId } = body
 
     if (!url || typeof url !== 'string') {
       return NextResponse.json(
@@ -1961,7 +1961,7 @@ export async function POST(req: Request) {
     }
 
     // Prepare data for Supabase
-    const recipeData = {
+    const recipeData: any = {
       title: parsed.title,
       ingredients: parsed.ingredients,
       instructions: parsed.instructions.length > 0 ? parsed.instructions.join('\n\n') : 'No instructions found',
@@ -1971,11 +1971,42 @@ export async function POST(req: Request) {
 
     // Insert into Supabase
     const supabase = createServerClient()
-    const { data, error } = await supabase
-      .from('recipes')
-      .insert(recipeData)
-      .select()
-      .single()
+    
+    // Try to insert with created_by first, fallback without it if column doesn't exist
+    let data, error
+    if (userId && typeof userId === 'string') {
+      // Try with created_by
+      const result = await supabase
+        .from('recipes')
+        .insert({ ...recipeData, created_by: userId })
+        .select()
+        .single()
+      
+      data = result.data
+      error = result.error
+      
+      // If error is about missing column, retry without created_by
+      if (error && (error.message.includes('created_by') || error.message.includes('column') || error.code === '42703')) {
+        const retryResult = await supabase
+          .from('recipes')
+          .insert(recipeData)
+          .select()
+          .single()
+        
+        data = retryResult.data
+        error = retryResult.error
+      }
+    } else {
+      // No userId, insert without created_by
+      const result = await supabase
+        .from('recipes')
+        .insert(recipeData)
+        .select()
+        .single()
+      
+      data = result.data
+      error = result.error
+    }
 
     if (error) {
       console.error('Supabase insert error:', error)

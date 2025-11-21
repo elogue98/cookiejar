@@ -43,3 +43,13 @@ body {
     color: var(--text-main) !important;
   }
 }
+
+/* Bounce animation for loading overlay */
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 2.8s infinite ease-in-out; /* 0.5x speed: 1.4s * 2 */
+}

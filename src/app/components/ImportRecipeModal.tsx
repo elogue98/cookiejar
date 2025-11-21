@@ -2,6 +2,8 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useUser } from '@/lib/userContext'
+import LoadingOverlay from './LoadingOverlay'
 
 type ImportMode = 'url' | 'image'
 
@@ -23,6 +25,7 @@ interface ExtractedRecipeData {
 
 export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModalProps) {
   const router = useRouter()
+  const { user } = useUser()
   const [mode, setMode] = useState<ImportMode>('url')
   const [url, setUrl] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -52,7 +55,10 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
       const res = await fetch('/api/import/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ 
+          url: url.trim(),
+          userId: user?.id,
+        }),
       })
 
       const data = await res.json()
@@ -135,6 +141,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
           metadataNotes: extractedData.metadataNotes || null,
           imageBuffer: extractedData.imageBuffer,
           imageMimeType: extractedData.imageMimeType,
+          userId: user?.id,
         }),
       })
 
@@ -210,22 +217,28 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
     onClose()
   }
 
+  const handleCancel = () => {
+    resetForm()
+  }
+
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
-      onClick={handleClose}
-    >
+    <>
+      {(loading || finalizing) && <LoadingOverlay onCancel={handleCancel} />}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}
+        onClick={handleClose}
+      >
       <div
         style={{
           backgroundColor: 'white',
@@ -691,6 +704,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         )}
       </div>
     </div>
+    </>
   )
 }
 

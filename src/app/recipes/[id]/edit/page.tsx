@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
-import Logo from '@/app/components/Logo'
+import Navigation from '@/app/components/Navigation'
 
 interface Recipe {
   id: string
@@ -129,14 +129,7 @@ export default function EditRecipePage() {
   if (loading) {
     return (
       <div className="min-h-screen" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>
-        <header className="border-b" style={{ borderColor: 'rgba(211, 78, 78, 0.1)', background: '#F9E7B2' }}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <Link href="/" className="flex items-center gap-3 text-3xl font-bold transition-colors" style={{ color: 'var(--text-main)' }}>
-              <Logo size={48} />
-              <span>Cookie Jar</span>
-            </Link>
-          </div>
-        </header>
+        <Navigation />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <p style={{ color: 'var(--text-main)' }}>Loading recipe...</p>
         </main>
@@ -147,14 +140,7 @@ export default function EditRecipePage() {
   if (fetchError) {
     return (
       <div className="min-h-screen" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>
-        <header className="border-b" style={{ borderColor: 'rgba(211, 78, 78, 0.1)', background: '#F9E7B2' }}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <Link href="/" className="flex items-center gap-3 text-3xl font-bold transition-colors" style={{ color: 'var(--text-main)' }}>
-              <Logo size={48} />
-              <span>Cookie Jar</span>
-            </Link>
-          </div>
-        </header>
+        <Navigation />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="rounded-lg border border-red-600 bg-red-50 p-4">
             <p className="text-red-700 font-semibold mb-2">Error</p>
@@ -177,23 +163,25 @@ export default function EditRecipePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#E2B59A] text-[#6B563F]">
-      <header className="border-b border-[#B77466]/30 bg-[#E2B59A]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3 text-3xl font-bold transition-colors" style={{ color: 'var(--text-main)' }}>
-              <Logo size={48} />
-              <span>Cookie Jar</span>
-            </Link>
+    <div className="min-h-screen" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>
+      <Navigation />
+      <div className="border-b" style={{ borderColor: 'rgba(211, 78, 78, 0.1)', background: '#F9E7B2' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-end">
             <Link
               href={`/recipes/${id}`}
-              className="px-4 py-2 bg-[#B77466] hover:bg-[#A86558] text-[#FFE1AF] font-medium rounded-lg transition-colors border border-[#B77466]/50"
+              className="px-4 py-2 font-medium transition-colors hover:opacity-90"
+              style={{
+                background: '#DDC57A',
+                color: '#2B2B2B',
+                borderRadius: '14px'
+              }}
             >
               ← Back to Recipe
             </Link>
           </div>
         </div>
-      </header>
+      </div>
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <section className="max-w-2xl">

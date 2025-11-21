@@ -3,8 +3,10 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import DeleteRecipeButton from '@/app/components/DeleteRecipeButton'
 import StarRating from '@/app/components/StarRating'
-import Logo from '@/app/components/Logo'
+import Navigation from '@/app/components/Navigation'
 import RecipeImageWithModal from '@/app/components/RecipeImageWithModal'
+import UserAvatar from '@/app/components/UserAvatar'
+import CookieBot from '@/app/components/CookieBot'
 
 // Helper to clean ingredient text - remove leading bullets and normalize whitespace
 function cleanIngredient(raw: string): string {
@@ -133,6 +135,12 @@ interface Recipe {
   image_url: string | null
   source_url: string | null
   cookbookSource: string | null
+  created_by?: string | null
+  creator?: {
+    id: string
+    name: string
+    avatar_url: string
+  } | null
 }
 
 interface PageProps {
@@ -142,6 +150,7 @@ interface PageProps {
 export default async function RecipeDetailPage({ params }: PageProps) {
   const { id } = await params
 
+  // Fetch recipe
   const { data: recipe, error } = await supabase
     .from('recipes')
     .select('*')
@@ -150,6 +159,82 @@ export default async function RecipeDetailPage({ params }: PageProps) {
 
   if (error || !recipe) {
     notFound()
+  }
+
+  // Fetch creator info if created_by exists
+  let creator: { id: string; name: string; avatar_url: string } | null = null
+  if ((recipe as any).created_by) {
+    const { data: creatorData, error: creatorError } = await supabase
+      .from('users')
+      .select('id, name, avatar_url')
+      .eq('id', (recipe as any).created_by)
+      .single()
+    
+    if (!creatorError && creatorData) {
+      creator = creatorData
+    }
+  }
+
+  // Calculate average rating from ratings table and fetch individual ratings with user names
+  let averageRating: number | null = null
+  let ratingEntries: { user: string; rating: number; avatar_url: string; user_id: string }[] | null = null
+  
+  try {
+    // Fetch ratings for this recipe
+    const { data: ratings, error: ratingsError } = await supabase
+      .from('ratings')
+      .select('rating, user_id')
+      .eq('recipe_id', id)
+
+    // If ratings table doesn't exist, use recipe.rating as fallback
+    if (ratingsError) {
+      if (ratingsError.code === '42P01' || ratingsError.message.includes('does not exist')) {
+        // Table doesn't exist yet - use old rating field
+        averageRating = recipe.rating
+        ratingEntries = null
+      } else {
+        console.error('Error fetching ratings:', ratingsError)
+        averageRating = recipe.rating // Fallback to old rating
+        ratingEntries = null
+      }
+    } else if (ratings && ratings.length > 0) {
+      // Calculate average
+      const sum = ratings.reduce((acc, r) => acc + r.rating, 0)
+      averageRating = Math.round((sum / ratings.length) * 10) / 10 // Round to 1 decimal place
+      
+      // Fetch user names and avatars for all user_ids in the ratings
+      const userIds = [...new Set(ratings.map(r => r.user_id))]
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id, name, avatar_url')
+        .in('id', userIds)
+      
+      // Create a map of user_id -> user data
+      const usersMap = new Map<string, { name: string; avatar_url: string }>()
+      if (users && !usersError) {
+        users.forEach(u => usersMap.set(u.id, { name: u.name, avatar_url: u.avatar_url }))
+      }
+      
+      // Map ratings to include user names and avatars
+      ratingEntries = ratings.map(r => {
+        const userData = usersMap.get(r.user_id)
+        return {
+          user: userData?.name || 'Unknown',
+          rating: r.rating,
+          avatar_url: userData?.avatar_url || '',
+          user_id: r.user_id
+        }
+      })
+    } else {
+      // No ratings yet, but table exists - show null
+      averageRating = null
+      ratingEntries = []
+    }
+  } catch (error) {
+    // If ratings table doesn't exist, use recipe.rating as fallback
+    console.error('Error fetching ratings:', error)
+    averageRating = recipe.rating
+    ratingEntries = null
   }
 
   // Normalize ingredients to structured format
@@ -219,7 +304,9 @@ export default async function RecipeDetailPage({ params }: PageProps) {
     ingredients: normalizedIngredients,
     instructions: normalizedInstructions,
     // Map cookbooksource (database) to cookbookSource (TypeScript)
-    cookbookSource: (recipe as any).cookbooksource || (recipe as any).cookbookSource || null
+    cookbookSource: (recipe as any).cookbooksource || (recipe as any).cookbookSource || null,
+    created_by: (recipe as any).created_by || null,
+    creator: creator
   }
 
   // Parse metadata from notes if it contains JSON
@@ -252,41 +339,36 @@ export default async function RecipeDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>
-      <header className="border-b" style={{ borderColor: 'rgba(211, 78, 78, 0.1)', background: '#F9E7B2' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3 text-3xl font-bold transition-colors cursor-pointer" style={{ color: 'var(--text-main)' }}>
-              <Logo size={48} />
-              <span>Cookie Jar</span>
+      <Navigation />
+      <div className="border-b" style={{ borderColor: 'rgba(211, 78, 78, 0.1)', background: '#F9E7B2' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-end gap-3">
+            <Link
+              href={`/recipes/${id}/edit`}
+              className="px-4 py-2 font-medium transition-colors hover:opacity-90"
+              style={{
+                background: '#DDC57A',
+                color: '#2B2B2B',
+                borderRadius: '14px'
+              }}
+            >
+              Edit Recipe
             </Link>
-            <div className="flex gap-3">
-              <Link
-                href={`/recipes/${id}/edit`}
-                className="px-4 py-2 font-medium transition-colors hover:opacity-90"
-                style={{
-                  background: '#DDC57A',
-                  color: '#2B2B2B',
-                  borderRadius: '14px'
-                }}
-              >
-                Edit Recipe
-              </Link>
-              <DeleteRecipeButton recipeId={id} recipeTitle={recipeData.title} />
-              <Link
-                href="/"
-                className="px-4 py-2 font-medium transition-colors hover:opacity-90"
-                style={{
-                  background: '#D34E4E',
-                  color: 'white',
-                  borderRadius: '14px'
-                }}
-              >
-                ← Back to Recipes
-              </Link>
-            </div>
+            <DeleteRecipeButton recipeId={id} recipeTitle={recipeData.title} />
+            <Link
+              href="/"
+              className="px-4 py-2 font-medium transition-colors hover:opacity-90"
+              style={{
+                background: '#D34E4E',
+                color: 'white',
+                borderRadius: '14px'
+              }}
+            >
+              ← Back to Recipes
+            </Link>
           </div>
         </div>
-      </header>
+      </div>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <article className="rounded-lg border p-6 md:p-8" style={{ 
@@ -305,27 +387,110 @@ export default async function RecipeDetailPage({ params }: PageProps) {
       imageUrl={recipeData.image_url}
       alt={recipeData.title}
     />
+    
+    {/* NUTRITION BELOW IMAGE */}
+    {metadata?.nutrition && (
+      <div className="mt-3 w-full max-w-[350px] bg-white rounded-xl shadow-sm p-6 text-xs">
+        {/* Two-column header row */}
+        <div className="grid grid-cols-2 items-center">
+          <h3 className="font-semibold text-xs">Nutrition per serving</h3>
+          <span className="text-right text-xs"><strong>Calories:</strong> {metadata.nutrition.calories}</span>
+        </div>
+        {/* Macros in single horizontal row */}
+        <div className="flex items-center justify-between mt-4 text-xs">
+          <div className="font-semibold">Protein:</div>
+          <div>{metadata.nutrition.protein}g</div>
+          <div className="font-semibold">Carbs:</div>
+          <div>{metadata.nutrition.carbs}g</div>
+          <div className="font-semibold">Fat:</div>
+          <div>{metadata.nutrition.fat}g</div>
+        </div>
+      </div>
+    )}
   </div>
 )}
 
-{/* RIGHT COLUMN */}
+  {/* RIGHT COLUMN */}
 <div className="flex flex-col gap-6 flex-1 [&>*]:block [&>*]:w-full">
-  {/* ROW 1: Title + Rating */}
-  <div className="flex justify-between items-start w-full">
-    <h2 className="text-3xl md:text-4xl font-bold leading-tight">
-      {recipeData.title}
-    </h2>
-    <StarRating recipeId={id} initialRating={recipeData.rating} />
-  </div>
-
-  {/* ROW 2: Description */}
-  {metadata?.description && (
-    <div className="block w-full">
-      <p className="text-gray-700 leading-relaxed block w-full">
-        {metadata.description}
-      </p>
+  {/* HEADER: 3-row, 3-column grid */}
+  <div className="grid grid-cols-[auto_1fr_auto] gap-x-4 gap-y-2 items-start w-full">
+    {/* ROW 1, COL 1: Title with Creator Icon */}
+    <div className="col-start-1 flex items-center gap-3">
+      <h2 className="text-3xl md:text-4xl font-bold leading-tight">
+        {recipeData.title}
+      </h2>
+      {recipeData.creator && (
+        <UserAvatar
+          src={recipeData.creator.avatar_url}
+          alt={recipeData.creator.name}
+          name={recipeData.creator.name}
+        />
+      )}
     </div>
-  )}
+
+    {/* ROW 1, COL 2: Empty spacer (flexible) */}
+    <div className="col-start-2"></div>
+
+    {/* ROW 1, COL 3: Average Rating with Hover Popover */}
+    {averageRating !== null && (
+      <div className="col-start-3 relative group cursor-pointer">
+        {/* Average rating display */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[18px]" style={{ color: '#DDC57A' }}>★</span>
+          <span className="text-[18px] font-medium text-[rgba(43,43,43,0.8)]">
+            {averageRating}/10
+          </span>
+        </div>
+
+        {/* Hover popover */}
+        {ratingEntries !== null && (
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-200 bg-white shadow-xl rounded-lg p-4 min-w-[200px] z-[9999] border border-gray-200">
+            <h4 className="font-semibold mb-2 text-sm text-gray-800">Ratings</h4>
+
+            {ratingEntries && ratingEntries.length > 0 ? (
+              <ul className="space-y-2 text-sm">
+                {ratingEntries.map((r, i) => (
+                  <li key={i} className="flex items-center justify-between text-gray-700 gap-3">
+                    <div className="flex items-center gap-2">
+                      {r.avatar_url && (
+                        <UserAvatar
+                          src={r.avatar_url}
+                          alt={r.user}
+                          name={r.user}
+                          size="small"
+                        />
+                      )}
+                      <span className="font-medium">{r.user}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[14px]" style={{ color: '#DDC57A' }}>★</span>
+                      <span>{r.rating}/10</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-gray-500">No individual ratings yet.</p>
+            )}
+          </div>
+        )}
+      </div>
+    )}
+
+    {/* ROW 2, COL 1: StarRating component (left-aligned under title) */}
+    <div className="col-start-1">
+      <StarRating recipeId={id} initialRating={averageRating} />
+    </div>
+
+    {/* ROW 3: Description spanning all 3 columns */}
+    {metadata?.description && (
+      <div className="col-span-3">
+        <p className="text-gray-700 leading-relaxed block w-full">
+          {metadata.description}
+        </p>
+      </div>
+    )}
+  </div>
 
   {/* ROW 3 — Cook Times + Servings */}
   {metadata && (
@@ -349,61 +514,47 @@ export default async function RecipeDetailPage({ params }: PageProps) {
       )}
     </div>
   )}
+
+  {/* View Original Source Link or Cookbook Source */}
+  {recipeData.source_url && (
+    <div className="mt-2">
+      <a
+        href={recipeData.source_url}
+        target="_blank"
+        className="text-sm underline text-[#D34E4E]"
+      >
+        View Original Source
+      </a>
+    </div>
+  )}
+  {recipeData.cookbookSource && (
+    <div className="mt-2">
+      <p className="text-sm" style={{ color: 'rgba(43, 43, 43, 0.7)' }}>
+        <span style={{ fontWeight: '500' }}>Source:</span> {recipeData.cookbookSource}
+      </p>
+    </div>
+  )}
+
+  {/* Tags */}
+  {recipeData.tags && recipeData.tags.length > 0 && (
+    <div className="flex flex-wrap justify-end w-full mt-2">
+      {recipeData.tags.map((tag, index) => (
+        <span
+          key={index}
+          className="px-3 py-1 text-sm font-medium mr-2 last:mr-0"
+          style={{
+            borderRadius: '20px',
+            backgroundColor: 'var(--accent-gold)',
+            color: 'var(--text-main)'
+          }}
+        >
+          {tag}
+        </span>
+      ))}
+    </div>
+  )}
 </div>
 </div>
-
-          {/* NUTRITION BELOW IMAGE */}
-          <div className="mt-6">
-            {metadata?.nutrition && (
-              <div className="bg-gray-50 p-4 rounded-lg text-sm leading-relaxed max-w-[300px] shadow-sm">
-                <h3 className="font-semibold mb-2">Nutrition per serving</h3>
-                <div>Calories: {metadata.nutrition.calories}</div>
-                <div>Protein: {metadata.nutrition.protein}g</div>
-                <div>Fat: {metadata.nutrition.fat}g</div>
-                <div>Carbs: {metadata.nutrition.carbs}g</div>
-              </div>
-            )}
-
-            {recipeData.source_url && (
-              <div className="mt-4">
-                <a
-                  href={recipeData.source_url}
-                  target="_blank"
-                  className="text-sm underline text-[#D34E4E]"
-                >
-                  View Original Source
-                </a>
-              </div>
-            )}
-          </div>
-
-          {/* Cookbook Source */}
-          {recipeData.cookbookSource && (
-            <div>
-              <p className="text-sm" style={{ color: 'rgba(43, 43, 43, 0.7)' }}>
-                <span style={{ fontWeight: '500' }}>Source:</span> {recipeData.cookbookSource}
-              </p>
-            </div>
-          )}
-
-          {/* Tags */}
-          {recipeData.tags && recipeData.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-8">
-              {recipeData.tags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="px-3 py-1 text-sm font-medium"
-                  style={{
-                    borderRadius: '20px',
-                    backgroundColor: 'var(--accent-gold)',
-                    color: 'var(--text-main)'
-                  }}
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
 
           {/* Ingredients */}
           {Array.isArray(recipeData.ingredients) && recipeData.ingredients.length > 0 && (
@@ -465,8 +616,8 @@ export default async function RecipeDetailPage({ params }: PageProps) {
             </section>
           )}
 
-          {/* Notes */}
-          {recipeData.notes && (
+          {/* Notes - only show if notes are not JSON metadata */}
+          {recipeData.notes && !metadata && (
             <section className="mb-6 p-5 rounded-lg" style={{
               backgroundColor: 'var(--accent-light)',
               borderRadius: 'var(--radius-lg)'
@@ -495,6 +646,15 @@ export default async function RecipeDetailPage({ params }: PageProps) {
           )}
         </article>
       </main>
+
+      {/* CookieBot Chat Widget */}
+      <CookieBot
+        recipeId={id}
+        recipeTitle={recipeData.title}
+        ingredients={recipeData.ingredients}
+        instructions={recipeData.instructions}
+        tags={recipeData.tags}
+      />
     </div>
   )
 }

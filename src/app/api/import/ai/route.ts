@@ -379,6 +379,7 @@ export async function POST(req: Request) {
     let html: string | null = null
     let text: string | null = null
     let imageFile: File | null = null
+    let userId: string | null = null
 
     if (contentType.includes('multipart/form-data')) {
       // Handle FormData (for file uploads)
@@ -387,12 +388,14 @@ export async function POST(req: Request) {
       html = formData.get('html') as string | null
       text = formData.get('text') as string | null
       imageFile = formData.get('image') as File | null
+      userId = formData.get('userId') as string | null
     } else {
       // Handle JSON
       const body = await req.json()
       url = body.url || null
       html = body.html || null
       text = body.text || null
+      userId = body.userId || null
     }
 
     // Determine content source
@@ -531,7 +534,7 @@ export async function POST(req: Request) {
     const metadataNotes = formatMetadataForNotes(extractedRecipe)
     const tags = extractedRecipe.tags || []
 
-    const recipeData = {
+    const recipeData: any = {
       title: extractedRecipe.title,
       ingredients,
       instructions: instructions || 'No instructions found',
@@ -542,11 +545,42 @@ export async function POST(req: Request) {
 
     // Insert into Supabase
     const supabase = createServerClient()
-    const { data, error } = await supabase
-      .from('recipes')
-      .insert(recipeData)
-      .select()
-      .single()
+    
+    // Try to insert with created_by first, fallback without it if column doesn't exist
+    let data, error
+    if (userId && typeof userId === 'string') {
+      // Try with created_by
+      const result = await supabase
+        .from('recipes')
+        .insert({ ...recipeData, created_by: userId })
+        .select()
+        .single()
+      
+      data = result.data
+      error = result.error
+      
+      // If error is about missing column, retry without created_by
+      if (error && (error.message.includes('created_by') || error.message.includes('column') || error.code === '42703')) {
+        const retryResult = await supabase
+          .from('recipes')
+          .insert(recipeData)
+          .select()
+          .single()
+        
+        data = retryResult.data
+        error = retryResult.error
+      }
+    } else {
+      // No userId, insert without created_by
+      const result = await supabase
+        .from('recipes')
+        .insert(recipeData)
+        .select()
+        .single()
+      
+      data = result.data
+      error = result.error
+    }
 
     if (error) {
       console.error('Supabase insert error:', error)

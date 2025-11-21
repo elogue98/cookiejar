@@ -1,7 +1,6 @@
 import { supabase } from '@/lib/supabaseClient'
-import Link from 'next/link'
 import RecipeList from './components/RecipeList'
-import Logo from './components/Logo'
+import Navigation from './components/Navigation'
 
 interface Recipe {
   id: string
@@ -13,6 +12,12 @@ interface Recipe {
   instructions: string | null
   created_at: string | null
   cookbookSource: string | null
+  created_by?: string | null
+  creator?: {
+    id: string
+    name: string
+    avatar_url: string
+  } | null
 }
 
 export default async function Home() {
@@ -31,18 +36,79 @@ export default async function Home() {
     })
   }
 
-  const recipeList: Recipe[] = recipes || []
+  // Fetch all ratings for all recipes in one query
+  let averageRatingsMap: Record<string, number | null> = {}
+  try {
+    const { data: allRatings, error: ratingsError } = await supabase
+      .from('ratings')
+      .select('recipe_id, rating')
+
+    // If ratings table doesn't exist, use recipe.rating as fallback
+    if (ratingsError) {
+      if (ratingsError.code !== '42P01' && !ratingsError.message.includes('does not exist')) {
+        console.error('Error fetching ratings:', ratingsError)
+      }
+    } else if (allRatings) {
+      // Group ratings by recipe_id and calculate averages
+      const ratingsByRecipe: Record<string, number[]> = {}
+      allRatings.forEach((r) => {
+        if (!ratingsByRecipe[r.recipe_id]) {
+          ratingsByRecipe[r.recipe_id] = []
+        }
+        ratingsByRecipe[r.recipe_id].push(r.rating)
+      })
+
+      // Calculate average for each recipe
+      Object.keys(ratingsByRecipe).forEach((recipeId) => {
+        const ratings = ratingsByRecipe[recipeId]
+        const sum = ratings.reduce((acc, r) => acc + r, 0)
+        const average = Math.round((sum / ratings.length) * 10) / 10
+        averageRatingsMap[recipeId] = average
+      })
+    }
+  } catch (error) {
+    // If ratings table doesn't exist, use recipe.rating as fallback
+    console.error('Error fetching ratings:', error)
+  }
+
+  // Fetch all creators for recipes that have created_by
+  const creatorIds = [...new Set((recipes || []).map(r => (r as any).created_by).filter(Boolean))]
+  let creatorsMap: Record<string, { id: string; name: string; avatar_url: string }> = {}
+  
+  if (creatorIds.length > 0) {
+    try {
+      const { data: creators, error: creatorsError } = await supabase
+        .from('users')
+        .select('id, name, avatar_url')
+        .in('id', creatorIds)
+      
+      if (!creatorsError && creators) {
+        creators.forEach(creator => {
+          creatorsMap[creator.id] = creator
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching creators:', error)
+    }
+  }
+
+  // Map recipes with average ratings and creator info
+  const recipesWithAverageRatings: Recipe[] = (recipes || []).map((recipe) => {
+    const averageRating = averageRatingsMap[recipe.id] ?? recipe.rating
+    const createdBy = (recipe as any).created_by
+    const creator = createdBy && creatorsMap[createdBy] ? creatorsMap[createdBy] : null
+    
+    return {
+      ...recipe,
+      rating: averageRating,
+      created_by: createdBy || null,
+      creator: creator
+    }
+  })
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>
-      <header className="border-b" style={{ borderColor: 'rgba(211, 78, 78, 0.1)', background: '#F9E7B2' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <Link href="/" className="flex items-center gap-3 text-3xl font-bold transition-colors cursor-pointer" style={{ color: 'var(--text-main)' }}>
-            <Logo size={48} />
-            <span>Cookie Jar</span>
-          </Link>
-        </div>
-      </header>
+      <Navigation />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error ? (
@@ -56,7 +122,7 @@ export default async function Home() {
             </p>
           </div>
         ) : (
-          <RecipeList recipes={recipeList} />
+          <RecipeList recipes={recipesWithAverageRatings} />
         )}
       </main>
     </div>
