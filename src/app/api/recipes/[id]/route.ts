@@ -23,10 +23,11 @@ function generateIngredientChangeDescription(
       if (ing.length === 0) return []
       // Check if already structured
       if (typeof ing[0] === 'object' && ing[0] !== null && 'section' in ing[0]) {
-        return ing
+        return ing as IngredientGroup[]
       }
       // Legacy format - convert to structured
-      return [{ section: '', items: ing }]
+      const legacyItems = ing.filter((item) => typeof item === 'string') as string[]
+      return [{ section: '', items: legacyItems }]
     }
     return []
   }
@@ -122,10 +123,11 @@ function generateInstructionChangeDescription(
     if (Array.isArray(inst)) {
       if (inst.length === 0) return []
       if (typeof inst[0] === 'object' && inst[0] !== null && 'section' in inst[0]) {
-        return inst
+        return inst as InstructionGroup[]
       }
       // Legacy format
-      return [{ section: '', steps: inst }]
+      const legacySteps = inst.filter((step) => typeof step === 'string') as string[]
+      return [{ section: '', steps: legacySteps }]
     }
     if (typeof inst === 'string') {
       // Parse string format
@@ -359,7 +361,10 @@ export async function PUT(
             previousValue = existingRecipe.ingredients
             newValue = normalizedIngredients || updateData.ingredients
             if (JSON.stringify(previousValue) !== JSON.stringify(newValue)) {
-              description = generateIngredientChangeDescription(previousValue, newValue)
+              description = generateIngredientChangeDescription(
+                previousValue as IngredientValue,
+                newValue as IngredientValue
+              )
             }
           } else if (field === 'instructions') {
             previousValue = existingRecipe.instructions
@@ -369,13 +374,18 @@ export async function PUT(
             const prevStr = typeof previousValue === 'string' ? previousValue : JSON.stringify(previousValue)
             const newStr = typeof newValue === 'string' ? newValue : JSON.stringify(newValue)
             if (prevStr !== newStr) {
-              description = generateInstructionChangeDescription(previousValue, newValue)
+              description = generateInstructionChangeDescription(
+                previousValue as InstructionValue,
+                newValue as InstructionValue
+              )
             }
           } else if (field === 'tags') {
             previousValue = existingRecipe.tags
             newValue = updateData.tags
             if (JSON.stringify(previousValue) !== JSON.stringify(newValue)) {
-              description = `User updated tags from [${(previousValue || []).join(', ')}] to [${(newValue || []).join(', ')}]`
+              const previousTags = Array.isArray(previousValue) ? previousValue : []
+              const nextTags = Array.isArray(newValue) ? newValue : []
+              description = `User updated tags from [${previousTags.join(', ')}] to [${nextTags.join(', ')}]`
             }
           } else if (field === 'servings' || field === 'nutrition') {
             // These might be in notes/metadata - check if they're being updated
@@ -385,12 +395,14 @@ export async function PUT(
 
           // Only save version if values actually changed
           if (description) {
+            const safePrevious = previousValue === undefined ? null : previousValue
+            const safeNew = newValue === undefined ? null : newValue
             await saveRecipeVersion({
               recipe_id: id,
               user_id,
               field_changed: field,
-              previous_value: previousValue,
-              new_value: newValue,
+              previous_value: safePrevious,
+              new_value: safeNew,
               description,
             })
           }

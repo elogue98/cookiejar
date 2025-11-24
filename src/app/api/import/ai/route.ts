@@ -32,9 +32,30 @@ type WprmStructuredData = {
 
 type JsonLdRecipe = {
   '@type'?: string | string[]
-  image?: unknown
+  image?: JsonLdImage
   recipeIngredient?: unknown
   recipeInstructions?: unknown
+  description?: string
+  recipeYield?: string | number | (string | number)[]
+  prepTime?: string
+  cookTime?: string
+  totalTime?: string
+  recipeCuisine?: string | string[]
+  recipeCategory?: string | string[]
+  nutrition?: JsonLdNutrition
+  nutritionInformation?: JsonLdNutrition
+  [key: string]: unknown
+}
+
+type JsonLdNutrition = {
+  calories?: string | number
+  calorieContent?: string | number
+  proteinContent?: string | number
+  protein?: string | number
+  fatContent?: string | number
+  fat?: string | number
+  carbohydrateContent?: string | number
+  carbs?: string | number
   [key: string]: unknown
 }
 
@@ -324,15 +345,18 @@ function extractImageFromHTML(html: string, baseUrl: string): string | null {
   
   // Try JSON-LD image first
   const scripts = $('script[type="application/ld+json"]')
-  let recipe: JsonLdRecipe | null = null
+  let schemaImageUrl: string | null = null
   
   scripts.each((_, el) => {
     try {
       const jsonData = JSON.parse($(el).html() || '{}')
       const foundRecipe = findRecipeNode(jsonData)
-      if (foundRecipe) {
-        recipe = foundRecipe
-        return false
+      if (foundRecipe && foundRecipe.image !== undefined) {
+        const resolved = resolveImageUrl(foundRecipe.image, baseUrl)
+        if (resolved) {
+          schemaImageUrl = resolved
+          return false
+        }
       }
     } catch {
       // Ignore JSON parse errors
@@ -341,12 +365,8 @@ function extractImageFromHTML(html: string, baseUrl: string): string | null {
     return undefined
   })
   
-  // Extract image from JSON-LD
-  if (recipe?.image) {
-    const resolved = resolveImageUrl(recipe.image, baseUrl)
-    if (resolved) {
-      return resolved
-    }
+  if (schemaImageUrl) {
+    return schemaImageUrl
   }
   
   // Try og:image meta tag
@@ -481,33 +501,37 @@ function extractTextFromHTML(html: string): string {
   // Build metadata text from JSON-LD if found
   let metadataText = ''
   if (recipeMetadata) {
+    const metadata = recipeMetadata as JsonLdRecipe
     const metadataParts: string[] = []
-    if (recipeMetadata.description) metadataParts.push(`Description: ${recipeMetadata.description}`)
-    if (recipeMetadata.recipeYield) metadataParts.push(`Servings: ${recipeMetadata.recipeYield}`)
-    if (recipeMetadata.prepTime) metadataParts.push(`Prep Time: ${recipeMetadata.prepTime}`)
-    if (recipeMetadata.cookTime) metadataParts.push(`Cook Time: ${recipeMetadata.cookTime}`)
-    if (recipeMetadata.totalTime) metadataParts.push(`Total Time: ${recipeMetadata.totalTime}`)
-    if (recipeMetadata.recipeCuisine) {
-      const cuisine = Array.isArray(recipeMetadata.recipeCuisine) 
-        ? recipeMetadata.recipeCuisine.join(', ') 
-        : recipeMetadata.recipeCuisine
+    if (metadata.description) metadataParts.push(`Description: ${metadata.description}`)
+    if (metadata.recipeYield) metadataParts.push(`Servings: ${metadata.recipeYield}`)
+    if (metadata.prepTime) metadataParts.push(`Prep Time: ${metadata.prepTime}`)
+    if (metadata.cookTime) metadataParts.push(`Cook Time: ${metadata.cookTime}`)
+    if (metadata.totalTime) metadataParts.push(`Total Time: ${metadata.totalTime}`)
+    if (metadata.recipeCuisine) {
+      const cuisine = Array.isArray(metadata.recipeCuisine) 
+        ? metadata.recipeCuisine.join(', ') 
+        : metadata.recipeCuisine
       metadataParts.push(`Cuisine: ${cuisine}`)
     }
-    if (recipeMetadata.recipeCategory) {
-      const category = Array.isArray(recipeMetadata.recipeCategory) 
-        ? recipeMetadata.recipeCategory.join(', ') 
-        : recipeMetadata.recipeCategory
+    if (metadata.recipeCategory) {
+      const category = Array.isArray(metadata.recipeCategory) 
+        ? metadata.recipeCategory.join(', ') 
+        : metadata.recipeCategory
       metadataParts.push(`Category: ${category}`)
     }
     // Extract nutrition - handle both direct nutrition object and nutrition property
-    const nutrition = recipeMetadata.nutrition || recipeMetadata.nutritionInformation
+    const nutrition = (metadata.nutrition || metadata.nutritionInformation) as JsonLdNutrition | string | null
     if (nutrition) {
       const nutritionParts: string[] = []
       
       // Handle different schema.org formats
       // Calories can be: calories, calorieContent, or in a NutritionInformation object
-      const calories = nutrition.calories || nutrition.calorieContent || 
-                      (typeof nutrition === 'string' && nutrition.includes('calories') ? nutrition : null)
+      const calories =
+        (typeof nutrition === 'object' && nutrition
+          ? nutrition.calories || nutrition.calorieContent
+          : null) ||
+        (typeof nutrition === 'string' && nutrition.includes('calories') ? nutrition : null)
       if (calories) {
         // Extract number from string if needed (e.g., "250 calories" -> 250)
         const calMatch = String(calories).match(/(\d+)/)
@@ -515,21 +539,30 @@ function extractTextFromHTML(html: string): string {
       }
       
       // Protein
-      const protein = nutrition.proteinContent || nutrition.protein
+      const protein =
+        typeof nutrition === 'object' && nutrition
+          ? nutrition.proteinContent || nutrition.protein
+          : null
       if (protein) {
         const protMatch = String(protein).match(/([\d.]+)/)
         if (protMatch) nutritionParts.push(`Protein: ${protMatch[1]}g`)
       }
       
       // Fat
-      const fat = nutrition.fatContent || nutrition.fat
+      const fat =
+        typeof nutrition === 'object' && nutrition
+          ? nutrition.fatContent || nutrition.fat
+          : null
       if (fat) {
         const fatMatch = String(fat).match(/([\d.]+)/)
         if (fatMatch) nutritionParts.push(`Fat: ${fatMatch[1]}g`)
       }
       
       // Carbs
-      const carbs = nutrition.carbohydrateContent || nutrition.carbohydrates || nutrition.carbs
+      const carbs =
+        typeof nutrition === 'object' && nutrition
+          ? nutrition.carbohydrateContent || nutrition.carbohydrates || nutrition.carbs
+          : null
       if (carbs) {
         const carbsMatch = String(carbs).match(/([\d.]+)/)
         if (carbsMatch) nutritionParts.push(`Carbs: ${carbsMatch[1]}g`)
@@ -546,7 +579,7 @@ function extractTextFromHTML(html: string): string {
 
     const structuredParts: string[] = []
 
-    const ingredientLines = ensureArray(recipeMetadata.recipeIngredient)
+    const ingredientLines = ensureArray(metadata.recipeIngredient)
       .map((item) => {
         if (!item) return ''
         if (typeof item === 'string') return item
@@ -561,7 +594,7 @@ function extractTextFromHTML(html: string): string {
       structuredParts.push('INGREDIENTS (SCHEMA):\n' + ingredientLines.map((line) => `- ${line}`).join('\n'))
     }
 
-    const instructionLines = flattenJsonLdInstructions(recipeMetadata.recipeInstructions)
+    const instructionLines = flattenJsonLdInstructions(metadata.recipeInstructions)
     if (instructionLines.length > 0) {
       structuredParts.push('INSTRUCTIONS (SCHEMA):\n' + instructionLines.join('\n'))
     }

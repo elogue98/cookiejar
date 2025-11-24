@@ -141,6 +141,12 @@ type RecipeRow = Recipe & {
   created_by?: string | null
 }
 
+const isIngredientGroupArray = (items: unknown[]): items is { section: string; items: string[] }[] =>
+  items.length > 0 && typeof items[0] === 'object' && items[0] !== null && 'section' in items[0]
+
+const isInstructionGroupArray = (items: unknown[]): items is { section: string; steps: string[] }[] =>
+  items.length > 0 && typeof items[0] === 'object' && items[0] !== null && 'section' in items[0]
+
 interface PageProps {
   params: Promise<{ id: string }>
 }
@@ -219,7 +225,7 @@ export default async function RecipeDetail({ params }: PageProps) {
   let normalizedIngredients: { section: string; items: string[] }[] | null = null
   if (recipe.ingredients) {
     if (Array.isArray(recipe.ingredients)) {
-      if (recipe.ingredients.length > 0 && typeof recipe.ingredients[0] === 'object' && recipe.ingredients[0] !== null && 'section' in recipe.ingredients[0]) {
+      if (isIngredientGroupArray(recipe.ingredients)) {
         normalizedIngredients = (recipe.ingredients as { section: string; items: string[] }[]).map(group => {
           const cleanedSection = cleanSectionHeader(group.section || '')
           const cleanedItems = (group.items || [])
@@ -245,12 +251,7 @@ export default async function RecipeDetail({ params }: PageProps) {
   let normalizedInstructions: { section: string; steps: string[] }[] | null = null
   if (recipe.instructions) {
     if (Array.isArray(recipe.instructions)) {
-      if (
-        recipe.instructions.length > 0 &&
-        typeof recipe.instructions[0] === 'object' &&
-        recipe.instructions[0] !== null &&
-        'section' in recipe.instructions[0]
-      ) {
+      if (isInstructionGroupArray(recipe.instructions)) {
         normalizedInstructions = (recipe.instructions as { section: string; steps: string[] }[]).map((group) => {
           const cleanedSection = cleanSectionHeader(group.section || '')
           const cleanedSteps = (group.steps || [])
@@ -264,7 +265,7 @@ export default async function RecipeDetail({ params }: PageProps) {
         }).filter((group) => group.steps.length > 0 || group.section.trim().length > 0)
       }
     } else if (typeof recipe.instructions === 'string') {
-      const trimmed = recipe.instructions.trim()
+      const trimmed = (recipe.instructions as string).trim()
       let parsedStructured: unknown = null
       if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
         try {

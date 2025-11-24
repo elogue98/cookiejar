@@ -145,6 +145,14 @@ export async function POST(
 
     // Fetch the comment with user info
     const supabase = createServerClient()
+    const createdCommentId = result.data?.id
+    if (!createdCommentId) {
+      return NextResponse.json(
+        { success: false, error: 'Failed to create comment' },
+        { status: 500 }
+      )
+    }
+
     const { data: commentWithUser, error: fetchError } = await supabase
       .from('comments')
       .select(`
@@ -158,7 +166,7 @@ export async function POST(
           avatar_url
         )
       `)
-      .eq('id', result.data.id)
+      .eq('id', createdCommentId)
       .single()
 
     if (fetchError || !commentWithUser) {

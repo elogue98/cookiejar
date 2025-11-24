@@ -17,7 +17,7 @@ type VersionRow = {
   previous_value: Json | string | null
   new_value: Json | string | null
   description: string | null
-  users: VersionUser | null
+  users: VersionUser | VersionUser[] | null
 }
 
 /**
@@ -68,7 +68,7 @@ export async function GET(
     }
 
     // Transform the data to flatten user info and parse JSON values
-    const versionRows: VersionRow[] = Array.isArray(versions) ? versions : []
+    const versionRows: VersionRow[] = Array.isArray(versions) ? versions as VersionRow[] : []
     const transformedVersions = versionRows.map((version) => {
       let previousValue = null
       let newValue = null
@@ -93,6 +93,8 @@ export async function GET(
         newValue = version.new_value
       }
 
+      const relatedUser = Array.isArray(version.users) ? version.users[0] : version.users
+
       return {
         id: version.id,
         recipe_id: version.recipe_id,
@@ -102,11 +104,11 @@ export async function GET(
         previous_value: previousValue,
         new_value: newValue,
         description: version.description,
-        user: version.users
+        user: relatedUser
           ? {
-              id: version.users.id,
-              name: version.users.name,
-              avatar_url: version.users.avatar_url,
+              id: relatedUser.id,
+              name: relatedUser.name,
+              avatar_url: relatedUser.avatar_url,
             }
           : null,
       }
