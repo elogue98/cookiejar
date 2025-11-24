@@ -111,10 +111,10 @@ export default function StructuredEditPage() {
                    setInstructionList(steps)
                 }
              } else {
-                setInstructionList(text.split('\n').filter(t => t.trim()))
+                setInstructionList(text.split('\n').filter((line: string) => line.trim()))
              }
            } catch {
-              setInstructionList(text.split('\n').filter(t => t.trim()))
+              setInstructionList(text.split('\n').filter((line: string) => line.trim()))
            }
         }
 
