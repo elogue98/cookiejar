@@ -16,6 +16,18 @@ type RecipeInsertPayload = {
   tags: string[]
   cookbooksource: string | null
   notes: string | null
+  // Metadata fields
+  servings?: number | null
+  prep_time?: string | null
+  cook_time?: string | null
+  total_time?: string | null
+  cuisine?: string | null
+  meal_type?: string | null
+  // Nutrition (per serving)
+  calories?: number | null
+  protein_grams?: number | null
+  fat_grams?: number | null
+  carbs_grams?: number | null
 }
 
 /**
@@ -51,7 +63,27 @@ export async function POST(req: Request) {
       userId,
       ingredientSections,
       instructionSections,
+      // Metadata fields
+      servings,
+      prepTime,
+      cookTime,
+      totalTime,
+      cuisine,
+      mealType,
+      nutrition,
+      description,
     } = body
+
+    console.log('[Image Finalize] Received metadata:', {
+      servings,
+      prepTime,
+      cookTime,
+      totalTime,
+      cuisine,
+      mealType,
+      nutrition,
+      description,
+    })
 
     // Validate required fields
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
@@ -106,8 +138,30 @@ export async function POST(req: Request) {
       instructions: normalizedInstructions,
       tags: Array.isArray(tags) ? tags : [],
       cookbooksource: cookbookSource && cookbookSource.trim() ? cookbookSource.trim() : null,
-      notes: metadataNotes && typeof metadataNotes === 'string' && metadataNotes.trim() ? metadataNotes.trim() : null,
+      notes: description || (metadataNotes && typeof metadataNotes === 'string' && metadataNotes.trim() ? metadataNotes.trim() : null),
+      // Metadata fields
+      servings: servings || null,
+      prep_time: prepTime || null,
+      cook_time: cookTime || null,
+      total_time: totalTime || null,
+      cuisine: cuisine || null,
+      meal_type: mealType || null,
+      // Nutrition (per serving)
+      calories: nutrition?.calories || null,
+      protein_grams: nutrition?.protein || null,
+      fat_grams: nutrition?.fat || null,
+      carbs_grams: nutrition?.carbs || null,
     }
+
+    console.log('[Image Finalize] Prepared recipe data for insert:', {
+      servings: recipeData.servings,
+      prep_time: recipeData.prep_time,
+      cook_time: recipeData.cook_time,
+      calories: recipeData.calories,
+      protein_grams: recipeData.protein_grams,
+      fat_grams: recipeData.fat_grams,
+      carbs_grams: recipeData.carbs_grams,
+    })
 
     // Insert into Supabase
     const supabase = createServerClient()
@@ -149,9 +203,13 @@ export async function POST(req: Request) {
     }
 
     if (error) {
-      console.error('Supabase insert error:', error)
+      console.error('Supabase insert error:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      })
       return NextResponse.json(
-        { success: false, error: `Database error: ${error.message}` },
+        { success: false, error: error.details || error.message || 'Database insert failed' },
         { status: 500 }
       )
     }

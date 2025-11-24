@@ -10,6 +10,7 @@ import CookieBot from '@/app/components/CookieBot'
 import RecipeComments from '@/app/components/RecipeComments'
 import RecipeHistory from '@/app/components/RecipeHistory'
 import RecipeInteractionWrapper from '@/app/components/RecipeInteractionWrapper'
+import ImportCompletionOverlay from '@/app/components/ImportCompletionOverlay'
 
 // Helper functions
 function getDomain(url: string): string {
@@ -136,6 +137,18 @@ interface Recipe {
     name: string
     avatar_url: string
   } | null
+  // Metadata fields
+  servings?: number | null
+  prep_time?: string | null
+  cook_time?: string | null
+  total_time?: string | null
+  cuisine?: string | null
+  meal_type?: string | null
+  // Nutrition (per serving)
+  calories?: number | null
+  protein_grams?: number | null
+  fat_grams?: number | null
+  carbs_grams?: number | null
 }
 
 type RecipeRow = Recipe & {
@@ -149,12 +162,25 @@ const isIngredientGroupArray = (items: unknown[]): items is { section: string; i
 const isInstructionGroupArray = (items: unknown[]): items is { section: string; steps: string[] }[] =>
   items.length > 0 && typeof items[0] === 'object' && items[0] !== null && 'section' in items[0]
 
+type SearchParamsRecord = Record<string, string | string[] | undefined>
+
 interface PageProps {
   params: Promise<{ id: string }>
+  searchParams?: Promise<SearchParamsRecord>
 }
 
-export default async function RecipeDetail({ params }: PageProps) {
-  const { id } = await params
+export default async function RecipeDetail({ params, searchParams }: PageProps) {
+  const resolvedParams = await params
+  const resolvedSearchParams: SearchParamsRecord =
+    (searchParams ? await searchParams : {}) || {}
+
+  const { id } = resolvedParams
+  const importStatusRaw = resolvedSearchParams.import
+  const importStatus = Array.isArray(importStatusRaw)
+    ? importStatusRaw[0]
+    : importStatusRaw
+  const showImportOverlay = importStatus === 'review'
+  const cleanRecipePath = `/recipes/${id}`
 
   const { data: recipe, error } = await supabase
     .from('recipes')
@@ -318,6 +344,7 @@ export default async function RecipeDetail({ params }: PageProps) {
     creator: creator
   }
 
+  // Build metadata from database columns first, fallback to JSON parsing
   let metadata: {
     description?: string
     servings?: number
@@ -334,19 +361,56 @@ export default async function RecipeDetail({ params }: PageProps) {
     }
   } | null = null
 
-  if (recipeData.notes && typeof recipeData.notes === 'string') {
+  // Read from proper database columns
+  const hasMetadata = recipe.servings || recipe.prep_time || recipe.cook_time || 
+                      recipe.calories || recipe.protein_grams || recipe.fat_grams || recipe.carbs_grams
+
+  if (hasMetadata) {
+    metadata = {
+      description: recipe.notes || undefined,
+      servings: recipe.servings || undefined,
+      prepTime: recipe.prep_time || undefined,
+      cookTime: recipe.cook_time || undefined,
+      totalTime: recipe.total_time || undefined,
+      cuisine: recipe.cuisine || undefined,
+      mealType: recipe.meal_type || undefined,
+    }
+    
+    // Add nutrition if available
+    if (recipe.calories || recipe.protein_grams || recipe.fat_grams || recipe.carbs_grams) {
+      metadata.nutrition = {
+        calories: recipe.calories || undefined,
+        protein: recipe.protein_grams || undefined,
+        fat: recipe.fat_grams || undefined,
+        carbs: recipe.carbs_grams || undefined,
+      }
+    }
+  } else if (recipeData.notes && typeof recipeData.notes === 'string') {
+    // Fallback: try parsing old JSON format from notes
     try {
       const parsed = JSON.parse(recipeData.notes)
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         metadata = parsed
       }
     } catch (e) {
+      // Not JSON, treat notes as description
+      metadata = {
+        description: recipeData.notes
+      }
     }
   }
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <Navigation />
+
+      <ImportCompletionOverlay
+        isOpen={showImportOverlay}
+        recipeTitle={recipeData.title}
+        destinationPath={cleanRecipePath}
+        recipeId={id}
+        initialCookbookSource={recipeData.cookbookSource}
+      />
       
       {/* 
         We need to split the layout into two parts for the client wrapper:
@@ -503,10 +567,10 @@ export default async function RecipeDetail({ params }: PageProps) {
                </div>
              )}
   
-             {/* Notes (if not metadata) */}
-             {recipeData.notes && !metadata && (
+             {/* Description (if no metadata) */}
+             {recipeData.notes && !metadata?.description && (
                <div className="bg-amber-50 p-6 rounded-xl mb-10 text-amber-900 leading-relaxed">
-                 <h3 className="font-bold mb-2 text-sm uppercase tracking-wider opacity-70">Chef's Notes</h3>
+                 <h3 className="font-bold mb-2 text-sm uppercase tracking-wider opacity-70">Description</h3>
                  {recipeData.notes}
                </div>
              )}

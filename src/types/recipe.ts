@@ -14,6 +14,18 @@ export interface Recipe {
     name: string
     avatar_url: string
   } | null
+  // Metadata fields
+  servings?: number | null
+  prep_time?: string | null
+  cook_time?: string | null
+  total_time?: string | null
+  cuisine?: string | null
+  meal_type?: string | null
+  // Nutrition (per serving)
+  calories?: number | null
+  protein_grams?: number | null
+  fat_grams?: number | null
+  carbs_grams?: number | null
 }
 
 

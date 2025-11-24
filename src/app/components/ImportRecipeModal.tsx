@@ -23,6 +23,20 @@ interface ExtractedRecipeData {
   imageMimeType: string
   ingredientSections: { section: string; items: string[] }[]
   instructionSections: { section: string; steps: string[] }[]
+  // Metadata fields
+  servings?: number | null
+  prepTime?: string | null
+  cookTime?: string | null
+  totalTime?: string | null
+  cuisine?: string | null
+  mealType?: string | null
+  nutrition?: {
+    calories?: number | null
+    protein?: number | null
+    fat?: number | null
+    carbs?: number | null
+  } | null
+  description?: string | null
 }
 
 export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModalProps) {
@@ -35,8 +49,6 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
   const [dragActive, setDragActive] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [extractedData, setExtractedData] = useState<ExtractedRecipeData | null>(null)
-  const [cookbookSource, setCookbookSource] = useState('')
   const [finalizing, setFinalizing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -72,9 +84,10 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         return
       }
 
-      // Success - close modal and redirect
+      // Success - redirect to recipe with completion overlay
+      setLoading(false)
       onClose()
-      router.push(`/recipes/${data.data.id}`)
+      router.push(`/recipes/${data.data.id}?import=review`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
       setLoading(false)
@@ -110,12 +123,76 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         return
       }
 
-      // Success - close modal and redirect
+      // Success - redirect to recipe with completion overlay
+      setLoading(false)
       onClose()
-      router.push(`/recipes/${data.data.id}`)
+      router.push(`/recipes/${data.data.id}?import=review`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
       setLoading(false)
+    }
+  }
+
+  const finalizeImageImport = async (
+    dataToFinalize: ExtractedRecipeData,
+    cookbookSourceOverride: string | null = null
+  ) => {
+    setFinalizing(true)
+    setError(null)
+
+    console.log('[ImportRecipeModal] Finalizing extracted recipe:', {
+      servings: dataToFinalize.servings,
+      prepTime: dataToFinalize.prepTime,
+      cookTime: dataToFinalize.cookTime,
+      totalTime: dataToFinalize.totalTime,
+      nutrition: dataToFinalize.nutrition,
+      description: dataToFinalize.description,
+    })
+
+    try {
+      const payload = {
+        title: dataToFinalize.title,
+        ingredients: dataToFinalize.ingredients,
+        instructions: dataToFinalize.instructions,
+        tags: dataToFinalize.tags,
+        cookbookSource: cookbookSourceOverride,
+        metadataNotes: dataToFinalize.metadataNotes || null,
+        imageBuffer: dataToFinalize.imageBuffer,
+        imageMimeType: dataToFinalize.imageMimeType,
+        ingredientSections: dataToFinalize.ingredientSections,
+        instructionSections: dataToFinalize.instructionSections,
+        userId: user?.id,
+        servings: dataToFinalize.servings,
+        prepTime: dataToFinalize.prepTime,
+        cookTime: dataToFinalize.cookTime,
+        totalTime: dataToFinalize.totalTime,
+        cuisine: dataToFinalize.cuisine,
+        mealType: dataToFinalize.mealType,
+        nutrition: dataToFinalize.nutrition,
+        description: dataToFinalize.description,
+      }
+
+      console.log('[ImportRecipeModal] Sending payload to finalize:', payload)
+
+      const res = await fetch('/api/import/image/finalize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        setError(data.error || 'Failed to finalize recipe import')
+        setFinalizing(false)
+        return
+      }
+
+      onClose()
+      router.push(`/recipes/${data.data.id}?import=review`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+      setFinalizing(false)
     }
   }
 
@@ -148,60 +225,20 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
 
       const data = await res.json()
 
+      console.log('[ImportRecipeModal] Image extraction response:', data)
+
       if (!res.ok || !data.success) {
+        console.error('[ImportRecipeModal] Image extraction failed:', data.error)
         setError(data.error || 'Failed to extract recipe from image')
         setLoading(false)
         return
       }
 
-      // Store extracted data and show preview
-      setExtractedData(data.data)
       setLoading(false)
+      await finalizeImageImport(data.data, null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
       setLoading(false)
-    }
-  }
-
-  const handleFinalizeImport = async () => {
-    if (!extractedData) return
-
-    setFinalizing(true)
-    setError(null)
-
-    try {
-      const res = await fetch('/api/import/image/finalize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: extractedData.title,
-          ingredients: extractedData.ingredients,
-          instructions: extractedData.instructions,
-          tags: extractedData.tags,
-          cookbookSource: cookbookSource.trim() || null,
-          metadataNotes: extractedData.metadataNotes || null,
-          imageBuffer: extractedData.imageBuffer,
-          imageMimeType: extractedData.imageMimeType,
-          ingredientSections: extractedData.ingredientSections,
-          instructionSections: extractedData.instructionSections,
-          userId: user?.id,
-        }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok || !data.success) {
-        setError(data.error || 'Failed to finalize recipe import')
-        setFinalizing(false)
-        return
-      }
-
-      // Success - close modal and redirect
-      onClose()
-      router.push(`/recipes/${data.data.id}`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
-      setFinalizing(false)
     }
   }
 
@@ -246,13 +283,12 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
   }
 
   const resetForm = () => {
+    console.log('[ImportRecipeModal] Resetting form')
     setUrl('')
     setText('')
     setFile(null)
     setError(null)
     setLoading(false)
-    setExtractedData(null)
-    setCookbookSource('')
     setFinalizing(false)
   }
 
@@ -576,7 +612,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         )}
 
         {/* Image Form - Upload Step */}
-        {mode === 'image' && !extractedData && (
+        {mode === 'image' && (
           <form onSubmit={handleImageSubmit}>
             <div style={{ marginBottom: '20px' }}>
               <label
@@ -650,6 +686,9 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
               >
                 Choose Image
               </button>
+              <p style={{ fontSize: '12px', color: 'rgba(43, 43, 43, 0.6)', marginTop: '10px' }}>
+                After processing, you’ll add any cookbook details on the success overlay.
+              </p>
             </div>
 
             {error && (
@@ -670,200 +709,39 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
               <button
                 type="button"
                 onClick={handleClose}
-                disabled={loading}
+                disabled={loading || finalizing}
                 style={{
                   padding: '10px 24px',
                   border: '1px solid rgba(211, 78, 78, 0.2)',
                   background: 'white',
                   borderRadius: '14px',
                   color: 'var(--text-main)',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: loading ? 0.6 : 1,
+                  cursor: loading || finalizing ? 'not-allowed' : 'pointer',
+                  opacity: loading || finalizing ? 0.6 : 1,
                 }}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={loading || !file}
+                disabled={loading || finalizing || !file}
                 style={{
                   padding: '10px 24px',
                   background: '#D34E4E',
                   color: 'white',
                   border: 'none',
                   borderRadius: '14px',
-                  cursor: loading || !file ? 'not-allowed' : 'pointer',
-                  opacity: loading || !file ? 0.6 : 1,
+                  cursor: loading || finalizing || !file ? 'not-allowed' : 'pointer',
+                  opacity: loading || finalizing || !file ? 0.6 : 1,
                   fontWeight: '500',
                 }}
               >
-                {loading ? 'Processing...' : 'Extract Recipe'}
+                {loading || finalizing ? 'Processing...' : 'Extract & Import'}
               </button>
             </div>
           </form>
         )}
 
-        {/* Image Form - Preview Step */}
-        {mode === 'image' && extractedData && (
-          <div>
-            <div style={{ marginBottom: '20px' }}>
-              <h3 style={{
-                fontSize: '18px',
-                fontWeight: '600',
-                color: 'var(--text-main)',
-                marginBottom: '16px',
-              }}>
-                Review Extracted Recipe
-              </h3>
-
-              {/* Preview Image */}
-              {extractedData.imageDataUrl && (
-                <div style={{ marginBottom: '16px' }}>
-                  <img
-                    src={extractedData.imageDataUrl}
-                    alt="Recipe preview"
-                    style={{
-                      width: '100%',
-                      maxHeight: '200px',
-                      objectFit: 'contain',
-                      borderRadius: 'var(--radius-sm)',
-                      border: '1px solid rgba(211, 78, 78, 0.2)',
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* Title Preview */}
-              <div style={{ marginBottom: '12px' }}>
-                <p style={{ fontSize: '12px', color: 'rgba(43, 43, 43, 0.6)', marginBottom: '4px' }}>Title</p>
-                <p style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-main)' }}>
-                  {extractedData.title}
-                </p>
-              </div>
-
-              {/* Tags Preview */}
-              {extractedData.tags && extractedData.tags.length > 0 && (
-                <div style={{ marginBottom: '12px' }}>
-                  <p style={{ fontSize: '12px', color: 'rgba(43, 43, 43, 0.6)', marginBottom: '4px' }}>Tags</p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {extractedData.tags.map((tag, index) => (
-                      <span
-                        key={index}
-                        style={{
-                          padding: '4px 10px',
-                          fontSize: '11px',
-                          borderRadius: '20px',
-                          backgroundColor: 'var(--accent-gold)',
-                          color: 'var(--text-main)',
-                          fontWeight: '500',
-                        }}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Cookbook Source Field */}
-              <div style={{ marginBottom: '20px' }}>
-                <label
-                  htmlFor="cookbookSource"
-                  style={{
-                    display: 'block',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    color: 'var(--text-main)',
-                    marginBottom: '8px',
-                  }}
-                >
-                  Cookbook Source (optional)
-                </label>
-                <input
-                  type="text"
-                  id="cookbookSource"
-                  value={cookbookSource}
-                  onChange={(e) => setCookbookSource(e.target.value)}
-                  placeholder="e.g., Ottolenghi — Simple, page 134"
-                  disabled={finalizing}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid rgba(211, 78, 78, 0.2)',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: '14px',
-                    color: 'var(--text-main)',
-                    outline: 'none',
-                    opacity: finalizing ? 0.6 : 1,
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#D34E4E'
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = 'rgba(211, 78, 78, 0.2)'
-                  }}
-                />
-                <p style={{ fontSize: '12px', color: 'rgba(43, 43, 43, 0.6)', marginTop: '4px' }}>
-                  Add the cookbook name and page number if this recipe came from a cookbook
-                </p>
-              </div>
-            </div>
-
-            {error && (
-              <div
-                style={{
-                  padding: '12px',
-                  backgroundColor: '#FEE2E2',
-                  border: '1px solid #DC2626',
-                  borderRadius: 'var(--radius-sm)',
-                  marginBottom: '20px',
-                }}
-              >
-                <p style={{ color: '#DC2626', fontSize: '14px' }}>{error}</p>
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setExtractedData(null)
-                  setCookbookSource('')
-                  setError(null)
-                }}
-                disabled={finalizing}
-                style={{
-                  padding: '10px 24px',
-                  border: '1px solid rgba(211, 78, 78, 0.2)',
-                  background: 'white',
-                  borderRadius: '14px',
-                  color: 'var(--text-main)',
-                  cursor: finalizing ? 'not-allowed' : 'pointer',
-                  opacity: finalizing ? 0.6 : 1,
-                }}
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={handleFinalizeImport}
-                disabled={finalizing}
-                style={{
-                  padding: '10px 24px',
-                  background: '#D34E4E',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '14px',
-                  cursor: finalizing ? 'not-allowed' : 'pointer',
-                  opacity: finalizing ? 0.6 : 1,
-                  fontWeight: '500',
-                }}
-              >
-                {finalizing ? 'Importing...' : 'Import Recipe'}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
     </>

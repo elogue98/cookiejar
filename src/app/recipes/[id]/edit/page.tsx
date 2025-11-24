@@ -19,6 +19,18 @@ interface Recipe {
   source_url: string | null
   cookbookSource: string | null
   image_url: string | null
+  // Metadata fields
+  servings?: number | null
+  prep_time?: string | null
+  cook_time?: string | null
+  total_time?: string | null
+  cuisine?: string | null
+  meal_type?: string | null
+  // Nutrition (per serving)
+  calories?: number | null
+  protein_grams?: number | null
+  fat_grams?: number | null
+  carbs_grams?: number | null
 }
 
 type NutritionMetadata = {
@@ -56,7 +68,6 @@ export default function StructuredEditPage() {
   const [ingredientList, setIngredientList] = useState<string[]>([])
   const [instructionList, setInstructionList] = useState<string[]>([])
   const [tags, setTags] = useState('')
-  const [rating, setRating] = useState<string>('')
   const [sourceUrl, setSourceUrl] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   
@@ -123,24 +134,32 @@ export default function StructuredEditPage() {
         }
 
         setTags(data.tags?.join(', ') || '')
-        setRating(data.rating?.toString() || '')
         setSourceUrl(data.source_url || '')
 
-        // Metadata
-        if (data.notes) {
+        // Metadata - read from proper database columns first
+        setDescription(data.notes || '')
+        setServings(data.servings?.toString() || '')
+        setPrepTime(data.prep_time || '')
+        setCookTime(data.cook_time || '')
+        setTotalTime(data.total_time || '')
+        setCuisine(data.cuisine || '')
+        setMealType(data.meal_type || '')
+        
+        // Fallback: try parsing old JSON format from notes if new fields are empty
+        if (!data.servings && !data.prep_time && !data.cook_time && data.notes) {
           try {
             const parsed = JSON.parse(data.notes)
             if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-              setDescription(parsed.description || '')
-              setServings(parsed.servings?.toString() || '')
-              setPrepTime(parsed.prepTime || '')
-              setCookTime(parsed.cookTime || '')
-              setTotalTime(parsed.totalTime || '')
-              setCuisine(parsed.cuisine || '')
-              setMealType(parsed.mealType || '')
+              if (parsed.description) setDescription(parsed.description)
+              if (parsed.servings) setServings(parsed.servings?.toString())
+              if (parsed.prepTime) setPrepTime(parsed.prepTime)
+              if (parsed.cookTime) setCookTime(parsed.cookTime)
+              if (parsed.totalTime) setTotalTime(parsed.totalTime)
+              if (parsed.cuisine) setCuisine(parsed.cuisine)
+              if (parsed.mealType) setMealType(parsed.mealType)
             }
           } catch (e) {
-             // Ignore
+             // Ignore - not JSON
           }
         }
         
@@ -270,17 +289,6 @@ export default function StructuredEditPage() {
     if (!title.trim()) return
     setSaving(true)
 
-    const metadata: RecipeMetadata = {}
-    if (description) metadata.description = description
-    if (servings) metadata.servings = parseInt(servings)
-    if (prepTime) metadata.prepTime = prepTime
-    if (cookTime) metadata.cookTime = cookTime
-    if (totalTime) metadata.totalTime = totalTime
-    if (cuisine) metadata.cuisine = cuisine
-    if (mealType) metadata.mealType = mealType
-
-    const notesToSave = Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null
-
     // Helper to convert flat list with SECTION markers into structured array
     const buildStructuredList = (list: string[], itemKey: 'items' | 'steps') => {
       const groups: { section: string; items?: string[]; steps?: string[] }[] = []
@@ -347,10 +355,16 @@ export default function StructuredEditPage() {
           ingredients: structuredIngredients, // Send structured data directly
           instructions: structuredInstructions, // Send structured data directly
           tags,
-          rating: rating || null,
-          notes: notesToSave,
+          notes: description || null, // Store description in notes field
           source_url: sourceUrl || null,
           user_id: user?.id || null,
+          // Metadata fields (store in proper database columns)
+          servings: servings ? parseInt(servings) : null,
+          prep_time: prepTime || null,
+          cook_time: cookTime || null,
+          total_time: totalTime || null,
+          cuisine: cuisine || null,
+          meal_type: mealType || null,
         }),
       })
 
@@ -506,7 +520,7 @@ export default function StructuredEditPage() {
                         placeholder="30m"
                       />
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <label className="block text-sm font-medium text-slate-700 mb-1">Servings</label>
                       <input
                         type="number"
@@ -514,16 +528,6 @@ export default function StructuredEditPage() {
                         onChange={(e) => setServings(e.target.value)}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg"
                         placeholder="4"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Rating</label>
-                      <input
-                        type="number"
-                        value={rating}
-                        onChange={(e) => setRating(e.target.value)}
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg"
-                        min="1" max="10"
                       />
                     </div>
                   </div>

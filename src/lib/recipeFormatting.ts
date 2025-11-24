@@ -24,14 +24,54 @@ export type RecipeMetadataSource = {
   } | null
 }
 
+// Generic headers that should be removed if they're the only section
+const GENERIC_INGREDIENT_HEADERS = [
+  'ingredients',
+  'ingredient',
+  'what you need',
+  'you will need',
+  'shopping list',
+]
+
+const GENERIC_INSTRUCTION_HEADERS = [
+  'instructions',
+  'instruction',
+  'method',
+  'directions',
+  'direction',
+  'steps',
+  'how to make',
+  'preparation',
+]
+
+function isGenericHeader(text: string, genericList: string[]): boolean {
+  const normalized = text.toLowerCase().trim().replace(/[:\s]+$/, '')
+  return genericList.includes(normalized)
+}
+
 export function normalizeIngredientSections(
   sections: IngredientSectionInput[]
 ) {
   return sections
-    .map((section) => ({
-      section: section.section?.trim() || '',
-      items: section.items.map((item) => item.trim()).filter(Boolean),
-    }))
+    .map((section) => {
+      const sectionText = section.section?.trim() || ''
+      const items = section.items
+        .map((item) => item.trim())
+        .filter(Boolean)
+        // Remove items that are just the section header repeated
+        .filter((item) => {
+          const itemNormalized = item.toLowerCase().trim().replace(/[:\s]+$/, '')
+          return itemNormalized !== sectionText.toLowerCase().trim().replace(/[:\s]+$/, '')
+        })
+      
+      // If section is generic and it's the only section, remove the section header
+      const shouldRemoveGeneric = sections.length === 1 && isGenericHeader(sectionText, GENERIC_INGREDIENT_HEADERS)
+      
+      return {
+        section: shouldRemoveGeneric ? '' : sectionText,
+        items,
+      }
+    })
     .filter((section) => section.items.length > 0)
 }
 
@@ -39,10 +79,25 @@ export function normalizeInstructionSections(
   sections: InstructionSectionInput[]
 ) {
   return sections
-    .map((section) => ({
-      section: section.section?.trim() || '',
-      steps: section.steps.map((step) => step.trim()).filter(Boolean),
-    }))
+    .map((section) => {
+      const sectionText = section.section?.trim() || ''
+      const steps = section.steps
+        .map((step) => step.trim())
+        .filter(Boolean)
+        // Remove steps that are just the section header repeated
+        .filter((step) => {
+          const stepNormalized = step.toLowerCase().trim().replace(/[:\s]+$/, '')
+          return stepNormalized !== sectionText.toLowerCase().trim().replace(/[:\s]+$/, '')
+        })
+      
+      // If section is generic and it's the only section, remove the section header
+      const shouldRemoveGeneric = sections.length === 1 && isGenericHeader(sectionText, GENERIC_INSTRUCTION_HEADERS)
+      
+      return {
+        section: shouldRemoveGeneric ? '' : sectionText,
+        steps,
+      }
+    })
     .filter((section) => section.steps.length > 0)
 }
 

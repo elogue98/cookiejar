@@ -4,6 +4,7 @@ import { generateTagsForRecipe } from '@/lib/aiTagging'
 import { uploadOptimizedImage } from '@/lib/imageOptimization'
 import OpenAI from 'openai'
 import { aiComplete } from '@/lib/ai'
+import { ensureMetadataCompleteness } from '@/lib/metadataCompletion'
 import { z } from 'zod'
 import {
   normalizeIngredientSections,
@@ -140,9 +141,15 @@ async function extractRecipeWithAI(content: string, contentType: 'html' | 'text'
 
 8. **Be warm, helpful, and funny, but NEVER change existing recipe content.**
 
-9. **For metadata (servings, prepTime, cookTime, etc.)**: Only extract if explicitly present in the content. Do not infer or estimate.
+9. **For metadata (CRITICAL)**:
+   - **servings (REQUIRED)**: Extract from "Serves X", "Makes X", etc. If NOT found, estimate based on recipe type (desserts: 8-12, breads: 10-16, mains: 4-6, default: 4)
+   - **prepTime, cookTime, totalTime**: Extract if present
+   - **cuisine, mealType**: Extract if mentioned
+   - **nutrition (MANDATORY)**: Extract from content OR CALCULATE from ingredients. ALWAYS include at minimum calories per serving.
 
-10. **For tags**: Generate tags based on what's actually in the recipe (ingredients, cooking methods mentioned, etc.), but keep them relevant and accurate.
+10. **Section headers**: If the only section header is generic like "Instructions", "Ingredients", "Method", leave section empty. Don't include generic headers as step 1 or item 1.
+
+11. **For tags**: Generate tags based on what's actually in the recipe (ingredients, cooking methods mentioned, etc.), but keep them relevant and accurate.
 
 Return ONLY valid JSON, no markdown, no explanations.`
 
@@ -156,7 +163,21 @@ Handle:
 - Inconsistent spacing and line breaks
 - Nutrition facts embedded in text (extract macros if present)
 
-IMPORTANT: If instructions exist, preserve them exactly (only clean formatting). If instructions are completely missing or extremely minimal, generate detailed, comprehensive step-by-step instructions based on the ingredients - include all preparation, mixing, cooking, and finishing steps with specific details.
+IMPORTANT: 
+1. If instructions exist, preserve them exactly (only clean formatting). If instructions are completely missing or extremely minimal, generate detailed, comprehensive step-by-step instructions based on the ingredients - include all preparation, mixing, cooking, and finishing steps with specific details.
+
+2. Extract ALL metadata:
+   - **Servings (REQUIRED)**: CRITICAL - "Makes 1 loaf" → 12 servings (NOT 1!), "Makes 1 cake" → 10 servings (NOT 1!). When recipe makes ONE whole baked good, estimate portions from it. NEVER use 1 serving for breads/cakes/pies!
+   - **Prep time, cook time**: Estimate if not explicitly stated based on recipe complexity (e.g., "mussels in coconut milk" → prep: 10min, cook: 15min)
+   - **Nutrition (MANDATORY - DO NOT SKIP)**: 
+     * FIRST: Look for nutrition facts in the OCR text
+     * SECOND: If NOT found (which is common), YOU MUST CALCULATE from ingredients:
+       - Estimate calories/protein/fat/carbs for EACH ingredient based on quantity
+       - Sum all ingredients
+       - Divide by servings
+       - ALWAYS include at minimum: calories, protein, fat, carbs
+     * This is REQUIRED - do not leave nutrition empty!
+   - Cuisine, meal type if can be inferred from recipe name/ingredients
 
 OCR Text:
 ${content.substring(0, 8000)}`
@@ -224,8 +245,11 @@ ${content.substring(0, 8000)}`
 
   // Validate with zod schema
   const validated = RecipeExtractionSchema.parse(parsed)
+
+  // Ensure metadata (servings, times, nutrition) is always populated
+  const enriched = await ensureMetadataCompleteness(validated, content)
   
-  return validated
+  return enriched
 }
 
 function flattenIngredientPreview(
@@ -322,6 +346,13 @@ export async function POST(req: Request) {
     let extractedRecipe: RecipeExtraction
     try {
       extractedRecipe = await extractRecipeWithAI(ocrText, 'image_ocr')
+      console.log('[Image Import] AI extracted recipe metadata:', {
+        servings: extractedRecipe.servings,
+        prepTime: extractedRecipe.prepTime,
+        cookTime: extractedRecipe.cookTime,
+        nutrition: extractedRecipe.nutrition,
+        description: extractedRecipe.description,
+      })
     } catch (error) {
       console.error('Error extracting recipe with AI:', error)
       return NextResponse.json(
@@ -351,12 +382,21 @@ export async function POST(req: Request) {
           ingredients,
           instructions: instructions || 'No instructions found',
           tags,
-          metadataNotes, // Include metadata JSON string
+          metadataNotes, // Include metadata JSON string (legacy)
           imageDataUrl: imageDataUrl,
           imageBuffer: base64Image,
           imageMimeType: file.type,
           ingredientSections,
           instructionSections,
+          // Include structured metadata fields
+          servings: extractedRecipe.servings,
+          prepTime: extractedRecipe.prepTime,
+          cookTime: extractedRecipe.cookTime,
+          totalTime: extractedRecipe.totalTime,
+          cuisine: extractedRecipe.cuisine,
+          mealType: extractedRecipe.mealType,
+          nutrition: extractedRecipe.nutrition,
+          description: extractedRecipe.description,
         }
       },
       { status: 200 }

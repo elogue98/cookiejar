@@ -180,7 +180,29 @@ export async function PUT(
     
     // Parse request body
     const body = await req.json()
-    const { title, ingredients, instructions, tags, rating, notes, source_url, cookbookSource, user_id } = body
+    const { 
+      title, 
+      ingredients, 
+      instructions, 
+      tags, 
+      rating, 
+      notes, 
+      source_url, 
+      cookbookSource, 
+      user_id,
+      // Metadata fields
+      servings,
+      prep_time,
+      cook_time,
+      total_time,
+      cuisine,
+      meal_type,
+      // Nutrition (per serving)
+      calories,
+      protein_grams,
+      fat_grams,
+      carbs_grams
+    } = body
 
     // Get Supabase client
     const supabase = createServerClient()
@@ -221,6 +243,18 @@ export async function PUT(
       notes?: string | null
       source_url?: string | null
       cookbooksource?: string | null
+      // Metadata fields
+      servings?: number | null
+      prep_time?: string | null
+      cook_time?: string | null
+      total_time?: string | null
+      cuisine?: string | null
+      meal_type?: string | null
+      // Nutrition (per serving)
+      calories?: number | null
+      protein_grams?: number | null
+      fat_grams?: number | null
+      carbs_grams?: number | null
     } = {}
 
     // Only include title if provided
@@ -331,6 +365,40 @@ export async function PUT(
       updateData.cookbooksource = cookbookSource && typeof cookbookSource === 'string' 
         ? cookbookSource.trim() || null 
         : null
+    }
+
+    // Handle metadata fields
+    if (servings !== undefined) {
+      updateData.servings = servings && typeof servings === 'number' ? servings : null
+    }
+    if (prep_time !== undefined) {
+      updateData.prep_time = prep_time && typeof prep_time === 'string' ? prep_time.trim() || null : null
+    }
+    if (cook_time !== undefined) {
+      updateData.cook_time = cook_time && typeof cook_time === 'string' ? cook_time.trim() || null : null
+    }
+    if (total_time !== undefined) {
+      updateData.total_time = total_time && typeof total_time === 'string' ? total_time.trim() || null : null
+    }
+    if (cuisine !== undefined) {
+      updateData.cuisine = cuisine && typeof cuisine === 'string' ? cuisine.trim() || null : null
+    }
+    if (meal_type !== undefined) {
+      updateData.meal_type = meal_type && typeof meal_type === 'string' ? meal_type.trim() || null : null
+    }
+
+    // Handle nutrition fields
+    if (calories !== undefined) {
+      updateData.calories = calories && typeof calories === 'number' ? calories : null
+    }
+    if (protein_grams !== undefined) {
+      updateData.protein_grams = protein_grams && typeof protein_grams === 'number' ? protein_grams : null
+    }
+    if (fat_grams !== undefined) {
+      updateData.fat_grams = fat_grams && typeof fat_grams === 'number' ? fat_grams : null
+    }
+    if (carbs_grams !== undefined) {
+      updateData.carbs_grams = carbs_grams && typeof carbs_grams === 'number' ? carbs_grams : null
     }
 
     // Ensure at least one field is being updated

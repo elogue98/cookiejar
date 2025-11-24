@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createServerClient } from '@/lib/supabaseClient'
 import { uploadOptimizedImage } from '@/lib/imageOptimization'
 import { aiComplete } from '@/lib/ai'
+import { ensureMetadataCompleteness } from '@/lib/metadataCompletion'
 import {
   normalizeIngredientSections,
   normalizeInstructionSections,
@@ -779,6 +780,8 @@ async function extractRecipeWithAI(content: string, contentType: 'html' | 'text'
    - When the source recipe uses subheadings like "For the crust", "Make the filling", or "Assembly", preserve them as distinct ingredientSections and instructionSections in the same order.
    - Section titles may appear as headings, bold/strong lines before lists, or JSON-LD HowToSection names—capture the exact wording (punctuation and casing).
    - Attach ingredients/steps to the most recent heading. Only invent a generic heading if multiple groups are clearly separated but unlabeled.
+   - NEVER include generic section headers as the first step (e.g., don't put "Instructions" as step 1, "Ingredients" as the first item)
+   - If the only section header is a generic one like "Instructions", "Ingredients", "Method", "Directions", leave the section field empty
 
 5. **If the user wants changes (e.g., 'use 0.5 tbsp coconut oil'), you MUST:**
    - Confirm the specific change
@@ -813,14 +816,17 @@ Include ALL fields that have values. Omit optional fields if not found. Use null
   "tags": ["tag1", "tag2"]
 }
 
-**IMPORTANT FOR NUTRITION**: 
-1. If you find nutrition information in the content, extract it and include the nutrition object.
-2. If nutrition is NOT found in the content, CALCULATE it from the ingredients:
-   - Sum up estimated nutrition for all ingredients
-   - Divide by number of servings
+**CRITICAL: NUTRITION IS MANDATORY**: 
+1. FIRST: Try to find nutrition information in the content and extract it
+2. IF NOT FOUND: You MUST calculate it from the ingredients - this is REQUIRED, not optional:
+   - Estimate nutrition for EACH ingredient based on the quantity specified
+   - Sum up all ingredients' nutrition values
+   - Divide by number of servings to get per-serving values
    - Round appropriately (calories to nearest 5-10, macros to nearest 0.5-1g)
-   - Include the calculated nutrition object
-3. Even if only one value is found or calculated, still include the nutrition object with that value.
+   - ALWAYS include the calculated nutrition object
+3. Use your knowledge of food nutrition values to make reasonable estimates
+4. Even rough estimates are better than no nutrition information
+5. The nutrition object should ALWAYS be included with at least calories
 
 Examples:
 - If you see "250 calories per serving" → {"nutrition": {"calories": 250}}
@@ -836,9 +842,31 @@ Examples:
 
 10. **METADATA EXTRACTION (CRITICAL)**: Extract ALL available metadata from the content:
    - **description**: Recipe description or summary if present
-   - **servings**: Number of servings (extract the number, e.g., "Serves 4" → 4, "Makes 12" → 12)
+   - **servings**: REQUIRED - Number of servings/portions the recipe yields:
+     * CRITICAL: Understand the difference between "makes" and "serves":
+       - "Makes 1 loaf" → 12 servings (slices), NOT 1!
+       - "Makes 1 cake" → 10 servings (slices), NOT 1!
+       - "Makes 1 pie" → 8 servings (slices), NOT 1!
+       - "Makes 12 cookies" → 12 servings
+       - "Serves 4" → 4 servings
+       - "Yield: 6" → 6 servings
+     * When recipe "makes" one whole item, estimate serving count:
+       - Breads/loaves: 10-16 slices per loaf
+       - Cakes: 10-12 slices per cake
+       - Pies: 8 slices per pie
+       - Individual items (cookies/muffins): count those items
+     * If unclear, estimate: main dishes 4-6, sides 4-6
+     * NEVER use 1 serving for whole baked goods!
    - **prepTime**: Preparation time (e.g., "15 minutes", "PT15M", "15 mins", "2 hours")
+     * If not explicitly stated, estimate based on recipe complexity:
+       - Simple recipes (salads, quick stir-fries, sandwiches): 5-10 minutes
+       - Medium recipes (pasta dishes, basic mains, simple soups): 15-20 minutes
+       - Complex recipes (stews, braises, baked goods, multi-component dishes): 20-30 minutes
    - **cookTime**: Cooking time (e.g., "30 minutes", "PT30M", "30 mins", "20 mins")
+     * If not explicitly stated, estimate based on recipe type:
+       - Quick cooking (stir-fries, sautés, quick fish): 10-15 minutes
+       - Standard cooking (baked chicken, pasta, pan-fried items): 20-30 minutes
+       - Slow cooking (stews, braises, roasts, breads): 45-90 minutes
    - **totalTime**: Total time if explicitly stated, otherwise calculate from prepTime + cookTime
    - **cuisine**: Cuisine type if mentioned (e.g., "Italian", "Mexican", "Asian", "American")
    - **mealType**: Meal type if mentioned (e.g., "breakfast", "lunch", "dinner", "dessert", "snack")
@@ -896,10 +924,18 @@ IMPORTANT:
 
 2. Extract ALL available metadata from the page:
    - Recipe description/summary
-   - Servings (look for "Serves X", "Makes X servings", "Yield: X", etc.)
+   - **Servings (REQUIRED)**: 
+     * CRITICAL: "Makes 1 loaf/cake/pie" means multiple servings, NOT 1!
+       - "Makes 1 loaf" → 12 servings (slices)
+       - "Makes 1 cake" → 10 servings (slices)
+       - "Makes 1 pie" → 8 servings (slices)
+       - "Makes 12 cookies" → 12 servings
+       - "Serves 4" → 4 servings
+     * When recipe "makes" ONE whole baked good, estimate slices/portions
+     * NEVER use 1 serving for breads, cakes, pies, or other baked goods!
    - Prep time, cook time, and total time
    - Cuisine type and meal type if mentioned
-   - **Nutrition information (CRITICAL)**: 
+   - **Nutrition information (MANDATORY - MUST ALWAYS BE INCLUDED)**: 
      * FIRST: Look carefully for nutrition facts in the content:
        - Nutrition facts tables or nutrition labels
        - Text like "Calories: 250" or "250 calories per serving"
@@ -908,12 +944,13 @@ IMPORTANT:
        - "Carbs: 35g" or "35g carbs" or "Carbohydrates 35g"
        - Any section with "Nutrition" in the heading
        - Extract the numbers even if the format varies
-     * SECOND: If nutrition is NOT found, CALCULATE it from the ingredients:
-       - Estimate nutrition for each ingredient based on quantities
+     * SECOND: If nutrition is NOT found, YOU MUST CALCULATE it from the ingredients:
+       - Estimate nutrition for EACH ingredient based on quantities (use your knowledge)
        - Sum all ingredients' nutrition values
        - Divide by number of servings to get per-serving values
        - Round appropriately (calories to nearest 5-10, macros to nearest 0.5-1g)
-       - Always include calculated nutrition if you have ingredients and servings
+       - ALWAYS include nutrition - rough estimates are better than nothing
+       - At minimum, ALWAYS include calories
    - Recipe image URL
    - Any other metadata fields that are explicitly stated
 
@@ -921,6 +958,7 @@ IMPORTANT:
    - Detect ingredient and instruction subheadings (headings, bold/strong lines before lists, JSON-LD HowToSection names, etc.) and output them as the \`section\` field.
    - Keep the original order, casing, and punctuation of each heading.
    - Attach each list/step to the most recent heading. Only invent a short descriptive heading when separate blocks are clearly unlabeled.
+   - IMPORTANT: If the only section header is generic like "Instructions", "Ingredients", "Method", or "Directions", leave section empty and don't include it as a step/item.
 
 HTML Content:
 ${content.substring(0, 8000)}`
@@ -939,16 +977,20 @@ IMPORTANT:
 
 2. Extract ALL available metadata from the text:
    - Recipe description/summary
-   - Servings (look for "Serves X", "Makes X servings", etc.)
+   - **Servings (REQUIRED)**: 
+     * CRITICAL: "Makes 1 loaf" → 12 servings (NOT 1!), "Makes 1 cake" → 10 servings (NOT 1!)
+     * When recipe "makes" one whole item, estimate portions from that item
+     * NEVER use 1 serving for breads, cakes, pies!
    - Prep time, cook time, and total time
    - Cuisine type and meal type if mentioned
-   - **Nutrition information (CRITICAL)**:
+   - **Nutrition information (MANDATORY - MUST ALWAYS BE INCLUDED)**:
      * FIRST: Look for nutrition facts in the text (calories, protein, fat, carbs per serving)
-     * SECOND: If NOT found, CALCULATE from ingredients:
-       - Estimate nutrition for each ingredient based on quantities
+     * SECOND: If NOT found, YOU MUST CALCULATE from ingredients:
+       - Estimate nutrition for EACH ingredient based on quantities (use your knowledge)
        - Sum all ingredients' nutrition values
        - Divide by number of servings to get per-serving values
-       - Round appropriately and include calculated nutrition
+       - Round appropriately and ALWAYS include calculated nutrition
+       - At minimum, ALWAYS include calories
    - Any other metadata fields that are explicitly stated
 
 3. SECTION GROUPS (CRITICAL):
@@ -970,16 +1012,20 @@ IMPORTANT:
 
 2. Extract ALL available metadata from the text:
    - Recipe description/summary
-   - Servings (look for "Serves X", "Makes X servings", etc.)
+   - **Servings (REQUIRED)**: 
+     * CRITICAL: "Makes 1 loaf" → 12 servings (NOT 1!), "Makes 1 cake" → 10 servings (NOT 1!)
+     * When recipe "makes" one whole item, estimate portions from that item
+     * NEVER use 1 serving for breads, cakes, pies!
    - Prep time, cook time, and total time
    - Cuisine type and meal type if mentioned
-   - **Nutrition information (CRITICAL)**:
+   - **Nutrition information (MANDATORY - MUST ALWAYS BE INCLUDED)**:
      * FIRST: Look for nutrition facts in the text (calories, protein, fat, carbs per serving)
-     * SECOND: If NOT found, CALCULATE from ingredients:
-       - Estimate nutrition for each ingredient based on quantities
+     * SECOND: If NOT found, YOU MUST CALCULATE from ingredients:
+       - Estimate nutrition for EACH ingredient based on quantities (use your knowledge)
        - Sum all ingredients' nutrition values
        - Divide by number of servings to get per-serving values
-       - Round appropriately and include calculated nutrition
+       - Round appropriately and ALWAYS include calculated nutrition
+       - At minimum, ALWAYS include calories
    - Any other metadata fields that are explicitly stated
 
 3. SECTION GROUPS (CRITICAL):
@@ -1035,8 +1081,11 @@ ${content.substring(0, 8000)}`
 
   // Validate with zod schema
   const validated = RecipeExtractionSchema.parse(parsed)
+
+  // Ensure metadata completeness (servings, times, nutrition)
+  const enriched = await ensureMetadataCompleteness(validated, content)
   
-  return validated
+  return enriched
 }
 
 /**
@@ -1273,7 +1322,19 @@ export async function POST(req: Request) {
       instructions,
       tags,
       source_url: finalSourceUrl,
-      notes: metadataNotes || null,
+      notes: extractedRecipe.description || null,
+      // Metadata fields
+      servings: extractedRecipe.servings || null,
+      prep_time: extractedRecipe.prepTime || null,
+      cook_time: extractedRecipe.cookTime || null,
+      total_time: extractedRecipe.totalTime || null,
+      cuisine: extractedRecipe.cuisine || null,
+      meal_type: extractedRecipe.mealType || null,
+      // Nutrition (per serving)
+      calories: extractedRecipe.nutrition?.calories || null,
+      protein_grams: extractedRecipe.nutrition?.protein || null,
+      fat_grams: extractedRecipe.nutrition?.fat || null,
+      carbs_grams: extractedRecipe.nutrition?.carbs || null,
     }
 
     // Insert into Supabase
