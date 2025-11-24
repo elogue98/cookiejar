@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useUser } from '@/lib/userContext'
 import LoadingOverlay from './LoadingOverlay'
 
-type ImportMode = 'url' | 'image'
+type ImportMode = 'url' | 'image' | 'text'
 
 interface ImportRecipeModalProps {
   isOpen: boolean
@@ -28,6 +28,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
   const { user } = useUser()
   const [mode, setMode] = useState<ImportMode>('url')
   const [url, setUrl] = useState('')
+  const [text, setText] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [dragActive, setDragActive] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -57,6 +58,44 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           url: url.trim(),
+          userId: user?.id,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        setError(data.error || 'Failed to import recipe')
+        setLoading(false)
+        return
+      }
+
+      // Success - close modal and redirect
+      onClose()
+      router.push(`/recipes/${data.data.id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+      setLoading(false)
+    }
+  }
+
+  const handleTextSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!text.trim()) {
+      setError('Please paste recipe text')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/import/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          text: text.trim(),
           userId: user?.id,
         }),
       })
@@ -204,6 +243,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
 
   const resetForm = () => {
     setUrl('')
+    setText('')
     setFile(null)
     setError(null)
     setLoading(false)
@@ -265,7 +305,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
             Import Recipe
           </h2>
           <p style={{ color: 'rgba(43, 43, 43, 0.7)', fontSize: '14px' }}>
-            Import a recipe from a URL or upload an image
+            Import a recipe from a URL, image, or paste text
           </p>
         </div>
 
@@ -317,6 +357,26 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
             }}
           >
             Import via Image
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode('text')
+              resetForm()
+            }}
+            style={{
+              padding: '12px 24px',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              borderBottom: mode === 'text' ? '2px solid #D34E4E' : '2px solid transparent',
+              color: mode === 'text' ? '#D34E4E' : 'rgba(43, 43, 43, 0.7)',
+              fontWeight: mode === 'text' ? '600' : '400',
+              transition: 'all 0.2s',
+              marginBottom: '-2px',
+            }}
+          >
+            Paste Text
           </button>
         </div>
 
@@ -404,6 +464,104 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
                   borderRadius: '14px',
                   cursor: loading ? 'not-allowed' : 'pointer',
                   opacity: loading ? 0.6 : 1,
+                  fontWeight: '500',
+                }}
+              >
+                {loading ? 'Importing...' : 'Import Recipe'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Text Form */}
+        {mode === 'text' && (
+          <form onSubmit={handleTextSubmit}>
+            <div style={{ marginBottom: '20px' }}>
+              <label
+                htmlFor="text"
+                style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: 'var(--text-main)',
+                  marginBottom: '8px',
+                }}
+              >
+                Paste Recipe Text
+              </label>
+              <textarea
+                id="text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Paste recipe text here... (ingredients, instructions, etc.)"
+                disabled={loading}
+                rows={12}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid rgba(211, 78, 78, 0.2)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '14px',
+                  color: 'var(--text-main)',
+                  outline: 'none',
+                  opacity: loading ? 0.6 : 1,
+                  fontFamily: 'inherit',
+                  resize: 'vertical',
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#D34E4E'
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'rgba(211, 78, 78, 0.2)'
+                }}
+              />
+              <p style={{ fontSize: '12px', color: 'rgba(43, 43, 43, 0.6)', marginTop: '4px' }}>
+                Supports any text format: copied recipes, handwritten notes, screenshots converted to text, etc.
+              </p>
+            </div>
+
+            {error && (
+              <div
+                style={{
+                  padding: '12px',
+                  backgroundColor: '#FEE2E2',
+                  border: '1px solid #DC2626',
+                  borderRadius: 'var(--radius-sm)',
+                  marginBottom: '20px',
+                }}
+              >
+                <p style={{ color: '#DC2626', fontSize: '14px' }}>{error}</p>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={handleClose}
+                disabled={loading}
+                style={{
+                  padding: '10px 24px',
+                  border: '1px solid rgba(211, 78, 78, 0.2)',
+                  background: 'white',
+                  borderRadius: '14px',
+                  color: 'var(--text-main)',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.6 : 1,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading || !text.trim()}
+                style={{
+                  padding: '10px 24px',
+                  background: '#D34E4E',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '14px',
+                  cursor: loading || !text.trim() ? 'not-allowed' : 'pointer',
+                  opacity: loading || !text.trim() ? 0.6 : 1,
                   fontWeight: '500',
                 }}
               >

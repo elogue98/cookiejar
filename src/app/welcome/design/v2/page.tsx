@@ -1,22 +1,11 @@
-'use client'
-
 import Link from 'next/link'
-import { useState } from 'react'
 import Navigation from '@/app/components/Navigation'
 import Logo from '@/app/components/Logo'
-import ImportRecipeModal from '@/app/components/ImportRecipeModal'
 
-export default function WelcomePage() {
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
-
+export default function WelcomeV2() {
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       <Navigation />
-      
-      <ImportRecipeModal 
-        isOpen={isImportModalOpen} 
-        onClose={() => setIsImportModalOpen(false)} 
-      />
       
       <div className="max-w-7xl mx-auto px-6 py-12 lg:py-24">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
@@ -43,12 +32,12 @@ export default function WelcomePage() {
               >
                 Start Cooking
               </Link>
-              <button 
-                onClick={() => setIsImportModalOpen(true)}
-                className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
+              <Link 
+                href="/import" 
+                className="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
               >
                 Try Import
-              </button>
+              </Link>
             </div>
 
             <div className="mt-16 grid grid-cols-3 gap-8 border-t border-slate-100 pt-8">

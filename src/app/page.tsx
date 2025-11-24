@@ -2,6 +2,9 @@ import { supabase } from '@/lib/supabaseClient'
 import RecipeList from './components/RecipeList'
 import Navigation from './components/Navigation'
 
+export const revalidate = 0
+export const dynamic = 'force-dynamic'
+
 interface Recipe {
   id: string
   title: string
@@ -107,10 +110,10 @@ export default async function Home() {
   })
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}>
+    <div className="min-h-screen bg-[#F2F4F6] text-[#2B2B2B]">
       <Navigation />
       
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {error ? (
           <div className="rounded-lg border border-red-600 bg-red-50 p-4">
             <p className="text-red-700 font-semibold mb-2">Error loading recipes</p>

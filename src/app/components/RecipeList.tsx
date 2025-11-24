@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import ImportRecipeModal from './ImportRecipeModal'
-import UserAvatar from './UserAvatar'
+import { useUser } from '@/lib/userContext'
 
 interface Recipe {
   id: string
@@ -27,9 +27,13 @@ interface RecipeListProps {
   recipes: Recipe[]
 }
 
+type FilterMode = 'all' | 'mine'
+
 export default function RecipeList({ recipes }: RecipeListProps) {
+  const { user } = useUser()
   const [searchTerm, setSearchTerm] = useState('')
   const [sortOption, setSortOption] = useState('date-desc')
+  const [filterMode, setFilterMode] = useState<FilterMode>('all')
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false)
   const sortDropdownRef = useRef<HTMLDivElement>(null)
@@ -87,13 +91,17 @@ export default function RecipeList({ recipes }: RecipeListProps) {
     }
   }
 
-  // Filter recipes based on unified search (title, ingredients, tags)
+  // Filter recipes based on unified search (title, ingredients, tags) AND ownership
   const filteredRecipes = useMemo(() => {
-    let filtered: Recipe[]
+    let filtered = recipes
 
-    if (!searchTerm.trim()) {
-      filtered = recipes
-    } else {
+    // 1. Filter by ownership (My Recipes vs All)
+    if (filterMode === 'mine' && user) {
+      filtered = filtered.filter(recipe => recipe.created_by === user.id)
+    }
+
+    // 2. Filter by search term
+    if (searchTerm.trim()) {
       // Split search query into tokens (words)
       const searchTokens = searchTerm
         .toLowerCase()
@@ -101,11 +109,9 @@ export default function RecipeList({ recipes }: RecipeListProps) {
         .split(/\s+/)
         .filter((token) => token.length > 0)
 
-      if (searchTokens.length === 0) {
-        filtered = recipes
-      } else {
+      if (searchTokens.length > 0) {
         // Filter and rank recipes
-        const recipesWithScores = recipes.map((recipe) => {
+        const recipesWithScores = filtered.map((recipe) => {
           const titleLower = recipe.title.toLowerCase()
           
           // Handle ingredients: can be string[] or structured format { section: string; items: string[] }[]
@@ -155,52 +161,105 @@ export default function RecipeList({ recipes }: RecipeListProps) {
       }
     }
 
-    // Apply sorting to filtered results
+    // 3. Apply sorting
     return sortRecipes(filtered, sortOption)
-  }, [recipes, searchTerm, sortOption])
+  }, [recipes, searchTerm, sortOption, filterMode, user])
+
+  // Set initial filter mode based on user presence (optional - defaults to 'all')
+  // If you want logged-in users to see "My Recipes" by default, uncomment below:
+  /* 
+  useEffect(() => {
+    if (user) setFilterMode('mine')
+  }, [user])
+  */
 
   return (
     <section className="w-full">
-      {/* Search + Sort + Import Row */}
-      <div className="w-full mb-6" style={{ position: 'relative' }}>
-        <div className="flex flex-col sm:flex-row items-center gap-4" style={{ position: 'relative' }}>
+      {/* Header Row: Title, Filter Toggle, and Add Button */}
+      <div className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h1 className="text-3xl font-bold text-[#2B2B2B]">
+            {filterMode === 'mine' ? 'My Recipes' : 'All Recipes'}
+          </h1>
+          <p className="text-[#2B2B2B]/60 mt-1">
+            {filterMode === 'mine' 
+              ? "Your personal collection of culinary experiments." 
+              : "Browse all recipes from the collection."}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-4">
+          {/* Toggle Filter (Only show if user is logged in) */}
+          {user && (
+            <div 
+              onClick={() => setFilterMode(prev => prev === 'all' ? 'mine' : 'all')}
+              className="bg-white p-1 rounded-full border border-gray-200 flex items-center shadow-sm relative cursor-pointer hover:bg-gray-50 transition-colors select-none"
+            >
+              {/* Sliding Background Pill */}
+              <div
+                className={`absolute top-1 bottom-1 rounded-full bg-[#F9E7B2] shadow-sm transition-all duration-300 ease-out border border-[#DDC57A]`}
+                style={{
+                  left: filterMode === 'all' ? '4px' : '50%',
+                  width: 'calc(50% - 4px)',
+                }}
+              />
+              
+              <div
+                className={`relative z-10 px-6 py-2 rounded-full text-sm font-medium transition-colors duration-300 text-center whitespace-nowrap ${
+                  filterMode === 'all' 
+                    ? 'text-[#CE7E5A]' 
+                    : 'text-[#2B2B2B]/60'
+                }`}
+                style={{ minWidth: '120px' }}
+              >
+                All Recipes
+              </div>
+              <div
+                className={`relative z-10 px-6 py-2 rounded-full text-sm font-medium transition-colors duration-300 text-center whitespace-nowrap ${
+                  filterMode === 'mine' 
+                    ? 'text-[#CE7E5A]' 
+                    : 'text-[#2B2B2B]/60'
+                }`}
+                style={{ minWidth: '120px' }}
+              >
+                My Recipes
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="bg-[#D34E4E] text-white px-6 py-3 rounded-[20px] font-medium hover:opacity-90 transition-opacity shadow-lg shadow-[#D34E4E]/20 whitespace-nowrap"
+          >
+            + New Recipe
+          </button>
+        </div>
+      </div>
+
+      {/* Search + Sort Row */}
+      <div className="w-full mb-8">
+        <div className="flex flex-col sm:flex-row items-center gap-4">
           {/* Search Input */}
           <input
             type="text"
             placeholder="Search by title, ingredient, or tag..."
-            className="flex-1 max-w-[85%] px-4 py-3 bg-white rounded-lg border focus:ring-2 focus:ring-[#D34E4E] focus:border-[#D34E4E] focus:outline-none"
-            style={{
-              borderColor: 'rgba(211, 78, 78, 0.2)',
-              color: 'var(--text-main)'
-            }}
+            className="flex-1 w-full px-5 py-3 bg-white rounded-[16px] border-0 shadow-[0_2px_10px_rgba(0,0,0,0.03)] focus:ring-2 focus:ring-[#D34E4E]/20 focus:outline-none text-[#2B2B2B]"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          
           {/* Sort Dropdown */}
-          <div ref={sortDropdownRef} className="relative" style={{ zIndex: 50, position: 'relative', flexShrink: 0 }}>
+          <div ref={sortDropdownRef} className="relative shrink-0 w-full sm:w-auto z-20">
             <button
               type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setIsSortDropdownOpen(!isSortDropdownOpen)
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border text-sm font-medium transition-all hover:shadow-md"
-              style={{
-                borderColor: '#D34E4E',
-                color: '#D34E4E',
-                cursor: 'pointer',
-                width: '180px',
-                justifyContent: 'space-between',
-                position: 'relative',
-                zIndex: 1
-              }}
+              onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+              className="w-full sm:w-auto flex items-center justify-between gap-3 px-5 py-3 bg-white rounded-[16px] text-sm font-medium text-[#D34E4E] hover:bg-white/80 transition-colors shadow-[0_2px_10px_rgba(0,0,0,0.03)]"
             >
               <span>
-                {sortOption === 'date-desc' && 'Date (Newest First)'}
-                {sortOption === 'date-asc' && 'Date (Oldest First)'}
-                {sortOption === 'rating-desc' && 'Rating (High → Low)'}
-                {sortOption === 'rating-asc' && 'Rating (Low → High)'}
+                {sortOption === 'date-desc' && 'Date (Newest)'}
+                {sortOption === 'date-asc' && 'Date (Oldest)'}
+                {sortOption === 'rating-desc' && 'Rating (High)'}
+                {sortOption === 'rating-asc' && 'Rating (Low)'}
               </span>
               <svg
                 width="12"
@@ -208,36 +267,14 @@ export default function RecipeList({ recipes }: RecipeListProps) {
                 viewBox="0 0 12 12"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
-                style={{
-                  transform: isSortDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s ease',
-                  flexShrink: 0
-                }}
+                className={`transform transition-transform duration-200 ${isSortDropdownOpen ? 'rotate-180' : ''}`}
               >
-                <path
-                  d="M6 9L1 4H11L6 9Z"
-                  fill="#D34E4E"
-                />
+                <path d="M6 9L1 4H11L6 9Z" fill="currentColor" />
               </svg>
             </button>
             
             {isSortDropdownOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 4px)',
-                  left: 0,
-                  backgroundColor: 'white',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(211, 78, 78, 0.2)',
-                  width: '180px',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                  zIndex: 10000,
-                  overflow: 'hidden',
-                  marginTop: 0,
-                  pointerEvents: 'auto'
-                }}
-              >
+              <div className="absolute right-0 mt-2 w-full sm:w-48 bg-white rounded-[16px] shadow-[0_4px_20px_rgba(0,0,0,0.1)] overflow-hidden py-1 border border-gray-100 z-50">
                 {[
                   { value: 'date-desc', label: 'Date (Newest First)' },
                   { value: 'date-asc', label: 'Date (Oldest First)' },
@@ -246,28 +283,13 @@ export default function RecipeList({ recipes }: RecipeListProps) {
                 ].map((option) => (
                   <button
                     key={option.value}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
+                    onClick={() => {
                       setSortOption(option.value)
                       setIsSortDropdownOpen(false)
                     }}
-                    className="w-full text-left px-4 py-2.5 text-sm transition-colors"
-                    style={{
-                      color: sortOption === option.value ? '#D34E4E' : 'var(--text-main)',
-                      backgroundColor: sortOption === option.value ? 'rgba(211, 78, 78, 0.08)' : 'transparent',
-                      fontWeight: sortOption === option.value ? '600' : '400'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (sortOption !== option.value) {
-                        e.currentTarget.style.backgroundColor = 'rgba(211, 78, 78, 0.05)'
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (sortOption !== option.value) {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }
-                    }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-[#F9E7B2]/20 ${
+                      sortOption === option.value ? 'text-[#D34E4E] font-semibold bg-[#F9E7B2]/10' : 'text-[#2B2B2B]'
+                    }`}
                   >
                     {option.label}
                   </button>
@@ -275,29 +297,7 @@ export default function RecipeList({ recipes }: RecipeListProps) {
               </div>
             )}
           </div>
-          {/* Import Button */}
-          <button
-            type="button"
-            onClick={() => setIsImportModalOpen(true)}
-            className="shrink-0 px-8 py-3 font-medium transition-colors hover:opacity-90 whitespace-nowrap"
-            style={{
-              background: '#D34E4E',
-              color: 'white',
-              borderRadius: '14px',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            Import Recipe
-          </button>
         </div>
-      </div>
-
-      {/* Recipe Count */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold" style={{ color: 'var(--text-main)' }}>
-          Recipes {filteredRecipes.length !== recipes.length && `(${filteredRecipes.length} of ${recipes.length})`}
-        </h2>
       </div>
 
       {/* Import Modal */}
@@ -308,163 +308,74 @@ export default function RecipeList({ recipes }: RecipeListProps) {
 
       {/* Recipe List */}
       {filteredRecipes.length === 0 ? (
-        <p style={{ color: 'rgba(43, 43, 43, 0.8)' }}>
-          {recipes.length === 0
-            ? 'No recipes yet'
-            : 'No recipes match your search criteria'}
-        </p>
+        <div className="text-center py-20">
+          <p className="text-[#2B2B2B]/60 text-lg">
+            {recipes.length === 0
+              ? "No recipes found."
+              : filterMode === 'mine'
+              ? "You haven't created any recipes yet."
+              : "No recipes match your search."}
+          </p>
+        </div>
       ) : (
-        <div 
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: '16px',
-            width: '100%'
-          }}
-        >
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredRecipes.map((recipe) => (
             <Link
               key={recipe.id}
               href={`/recipes/${recipe.id}`}
-              style={{
-                display: 'block',
-                border: '1px solid rgba(211, 78, 78, 0.1)',
-                borderRadius: 'var(--radius-lg)',
-                overflow: 'hidden',
-                backgroundColor: 'white',
-                textDecoration: 'none',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)'
-                e.currentTarget.style.transform = 'translateY(-2px)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }}
+              className="group bg-white rounded-[24px] p-3 hover:-translate-y-1 transition-all duration-300 shadow-[0_2px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] flex flex-col"
             >
-              {/* Image */}
-              <div 
-                style={{
-                  width: '100%',
-                  height: '180px',
-                  backgroundColor: 'var(--accent-light)',
-                  overflow: 'hidden',
-                  position: 'relative',
-                  borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0'
-                }}
-              >
+              {/* Image Container */}
+              <div className="relative aspect-[4/3] rounded-[20px] overflow-hidden mb-4 bg-[#F9E7B2] shrink-0">
                 {recipe.image_url ? (
                   <img
                     src={recipe.image_url}
                     alt={recipe.title}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      display: 'block'
-                    }}
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.style.display = 'none'
-                      if (target.parentElement) {
-                        target.parentElement.innerHTML = `<div style="width:100%;height:180px;display:flex;align-items:center;justify-content:center;background-color:var(--accent-light);"><span style="font-size:32px;">🍪</span></div>`
-                      }
-                    }}
+                    className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div style={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'var(--accent-light)'
-                  }}>
-                    <span style={{ fontSize: '32px' }}>🍪</span>
-                  </div>
-                )}
-                {/* Creator Avatar in corner */}
-                {recipe.creator && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    zIndex: 10
-                  }}>
-                    <UserAvatar
-                      src={recipe.creator.avatar_url}
-                      alt={recipe.creator.name}
-                      name={recipe.creator.name}
-                      size="default"
-                    />
-                  </div>
+                  <div className="w-full h-full flex items-center justify-center text-4xl">🍪</div>
                 )}
               </div>
 
               {/* Content */}
-              <div style={{ padding: '14px' }}>
-                <h3 style={{
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: 'var(--text-main)',
-                  marginBottom: '8px',
-                  lineHeight: '1.4',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden'
-                }}>
+              <div className="px-2 pb-2 flex flex-col flex-grow">
+                <h3 className="font-bold text-lg mb-3 text-[#2B2B2B] leading-tight group-hover:text-[#D34E4E] transition-colors line-clamp-2 min-h-[1.5em]">
                   {recipe.title}
                 </h3>
-
-                {/* Rating and Tags */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '6px',
-                  marginTop: '6px'
-                }}>
-                  {recipe.rating !== null && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ color: 'var(--accent-gold)', fontSize: '12px' }}>★</span>
-                      <span style={{ color: 'rgba(43, 43, 43, 0.8)', fontSize: '12px', fontWeight: '500' }}>
-                        {recipe.rating}/10
-                      </span>
-                    </div>
+                
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {recipe.tags?.slice(0, 3).map(tag => (
+                    <span key={tag} className="px-3 py-1 bg-[#F9E7B2]/30 text-[#CE7E5A] text-xs font-semibold rounded-full">
+                      {tag}
+                    </span>
+                  ))}
+                  {(recipe.tags?.length || 0) > 3 && (
+                    <span className="px-2 py-1 text-[#CE7E5A]/60 text-xs font-semibold">
+                      +{recipe.tags!.length - 3}
+                    </span>
                   )}
+                </div>
+
+                <div className="mt-auto pt-3 border-t border-gray-100 flex items-end justify-between">
+                  <div className="flex items-center gap-2">
+                    {recipe.creator ? (
+                      <>
+                        <img src={recipe.creator.avatar_url} className="w-6 h-6 rounded-full bg-gray-200 object-cover" alt="" />
+                        <span className="text-xs font-medium text-gray-500 truncate max-w-[100px]">{recipe.creator.name}</span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-gray-400">Unknown Chef</span>
+                    )}
+                  </div>
                   
-                  {/* Tags */}
-                  {recipe.tags && recipe.tags.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', flex: 1, justifyContent: 'flex-end' }}>
-                      {recipe.tags.slice(0, 2).map((tag, index) => (
-                        <span
-                          key={index}
-                          style={{
-                            padding: '4px 10px',
-                            fontSize: '10px',
-                            borderRadius: '20px',
-                            backgroundColor: 'var(--accent-gold)',
-                            color: 'var(--text-main)',
-                            fontWeight: '500'
-                          }}
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                      {recipe.tags.length > 2 && (
-                        <span style={{
-                          padding: '4px 8px',
-                          fontSize: '10px',
-                          color: 'rgba(43, 43, 43, 0.6)'
-                        }}>
-                          +{recipe.tags.length - 2}
-                        </span>
-                      )}
+                  {recipe.rating ? (
+                    <div className="flex items-center gap-1 text-[#D34E4E] font-bold text-sm">
+                      <span>★</span>
+                      <span>{recipe.rating}/10</span>
                     </div>
+                  ) : (
+                    <span className="text-xs text-gray-300">No rating</span>
                   )}
                 </div>
               </div>
@@ -475,4 +386,3 @@ export default function RecipeList({ recipes }: RecipeListProps) {
     </section>
   )
 }
-

@@ -162,25 +162,302 @@ function extractImageFromHTML(html: string, baseUrl: string): string | null {
 }
 
 /**
- * Extract text content from HTML
+ * Extract text content from HTML, including JSON-LD metadata
  */
 function extractTextFromHTML(html: string): string {
+  const ensureArray = (value: unknown): unknown[] => {
+    if (Array.isArray(value)) return value
+    if (value === undefined || value === null) return []
+    return [value]
+  }
+
+  const flattenJsonLdInstructions = (entries: unknown): string[] => {
+    const lines: string[] = []
+
+    const addEntry = (entry: unknown, depth = 0, index?: number) => {
+      if (entry === undefined || entry === null) return
+
+      if (typeof entry === 'string') {
+        const prefix = depth === 0 && typeof index === 'number' ? `${index + 1}.` : '-'
+        lines.push(`${prefix} ${entry.trim()}`)
+        return
+      }
+
+      if (typeof entry !== 'object') return
+
+      const record = entry as Record<string, unknown>
+
+      const types = ensureArray(record['@type']).map((type) => String(type))
+      if (types.includes('HowToSection')) {
+        const nameCandidate =
+          record['name'] ?? record['heading'] ?? record['section'] ?? record['text']
+        const name = typeof nameCandidate === 'string' ? nameCandidate.trim() : ''
+        if (name) {
+          lines.push(`=== ${name} ===`)
+        }
+        const children = ensureArray(record['itemListElement'] ?? record['steps'])
+        children.forEach((child, childIdx) => addEntry(child, depth + 1, childIdx))
+        return
+      }
+
+      const textCandidate =
+        record['text'] ?? record['description'] ?? record['name'] ?? record['step']
+      if (typeof textCandidate === 'string' && textCandidate.trim()) {
+        const prefix = depth === 0 && typeof index === 'number' ? `${index + 1}.` : '-'
+        lines.push(`${prefix} ${textCandidate.trim()}`)
+      }
+
+      const children = ensureArray(record['itemListElement'] ?? record['steps'])
+      if (children.length > 0) {
+        children.forEach((child, childIdx) => addEntry(child, depth + 1, childIdx))
+      }
+    }
+
+    ensureArray(entries).forEach((entry, idx) => addEntry(entry, 0, idx))
+    return lines
+  }
+
   const $ = cheerio.load(html)
   
-  // Remove script and style tags
-  $('script, style, noscript').remove()
+  // First, extract JSON-LD Recipe schema metadata if present
+  const scripts = $('script[type="application/ld+json"]')
+  let recipeMetadata: any = null
   
-  // Get main content areas
+  scripts.each((_, el) => {
+    try {
+      const jsonData = JSON.parse($(el).html() || '{}')
+      let recipe: any = null
+      
+      if (Array.isArray(jsonData)) {
+        recipe = jsonData.find((item: any) => {
+          const type = item['@type']
+          return type === 'Recipe' || 
+                 type === 'http://schema.org/Recipe' || 
+                 type === 'https://schema.org/Recipe' ||
+                 (Array.isArray(type) && type.includes('Recipe'))
+        })
+      } else if (jsonData['@type'] === 'Recipe' || 
+                 jsonData['@type'] === 'http://schema.org/Recipe' ||
+                 jsonData['@type'] === 'https://schema.org/Recipe') {
+        recipe = jsonData
+      } else if (Array.isArray(jsonData['@type']) && jsonData['@type'].includes('Recipe')) {
+        recipe = jsonData
+      }
+      
+      if (recipe) {
+        recipeMetadata = recipe
+        return false // break
+      }
+    } catch {
+      // Ignore JSON parse errors
+    }
+  })
+  
+  // Build metadata text from JSON-LD if found
+  let metadataText = ''
+  if (recipeMetadata) {
+    const metadataParts: string[] = []
+    if (recipeMetadata.description) metadataParts.push(`Description: ${recipeMetadata.description}`)
+    if (recipeMetadata.recipeYield) metadataParts.push(`Servings: ${recipeMetadata.recipeYield}`)
+    if (recipeMetadata.prepTime) metadataParts.push(`Prep Time: ${recipeMetadata.prepTime}`)
+    if (recipeMetadata.cookTime) metadataParts.push(`Cook Time: ${recipeMetadata.cookTime}`)
+    if (recipeMetadata.totalTime) metadataParts.push(`Total Time: ${recipeMetadata.totalTime}`)
+    if (recipeMetadata.recipeCuisine) {
+      const cuisine = Array.isArray(recipeMetadata.recipeCuisine) 
+        ? recipeMetadata.recipeCuisine.join(', ') 
+        : recipeMetadata.recipeCuisine
+      metadataParts.push(`Cuisine: ${cuisine}`)
+    }
+    if (recipeMetadata.recipeCategory) {
+      const category = Array.isArray(recipeMetadata.recipeCategory) 
+        ? recipeMetadata.recipeCategory.join(', ') 
+        : recipeMetadata.recipeCategory
+      metadataParts.push(`Category: ${category}`)
+    }
+    // Extract nutrition - handle both direct nutrition object and nutrition property
+    const nutrition = recipeMetadata.nutrition || recipeMetadata.nutritionInformation
+    if (nutrition) {
+      const nutritionParts: string[] = []
+      
+      // Handle different schema.org formats
+      // Calories can be: calories, calorieContent, or in a NutritionInformation object
+      const calories = nutrition.calories || nutrition.calorieContent || 
+                      (typeof nutrition === 'string' && nutrition.includes('calories') ? nutrition : null)
+      if (calories) {
+        // Extract number from string if needed (e.g., "250 calories" -> 250)
+        const calMatch = String(calories).match(/(\d+)/)
+        if (calMatch) nutritionParts.push(`Calories: ${calMatch[1]}`)
+      }
+      
+      // Protein
+      const protein = nutrition.proteinContent || nutrition.protein
+      if (protein) {
+        const protMatch = String(protein).match(/([\d.]+)/)
+        if (protMatch) nutritionParts.push(`Protein: ${protMatch[1]}g`)
+      }
+      
+      // Fat
+      const fat = nutrition.fatContent || nutrition.fat
+      if (fat) {
+        const fatMatch = String(fat).match(/([\d.]+)/)
+        if (fatMatch) nutritionParts.push(`Fat: ${fatMatch[1]}g`)
+      }
+      
+      // Carbs
+      const carbs = nutrition.carbohydrateContent || nutrition.carbohydrates || nutrition.carbs
+      if (carbs) {
+        const carbsMatch = String(carbs).match(/([\d.]+)/)
+        if (carbsMatch) nutritionParts.push(`Carbs: ${carbsMatch[1]}g`)
+      }
+      
+      if (nutritionParts.length > 0) {
+        metadataParts.push(`Nutrition (per serving): ${nutritionParts.join(', ')}`)
+      }
+    }
+    
+    if (metadataParts.length > 0) {
+      metadataText = '\n\nRECIPE METADATA:\n' + metadataParts.join('\n') + '\n'
+    }
+
+    const structuredParts: string[] = []
+
+    const ingredientLines = ensureArray(recipeMetadata.recipeIngredient)
+      .map((item) => {
+        if (!item) return ''
+        if (typeof item === 'string') return item
+        if (typeof item === 'object' && 'text' in item && item.text) return String(item.text)
+        if (typeof item === 'object' && 'name' in item && item.name) return String(item.name)
+        return ''
+      })
+      .map((line) => line.replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+
+    if (ingredientLines.length > 0) {
+      structuredParts.push('INGREDIENTS (SCHEMA):\n' + ingredientLines.map((line) => `- ${line}`).join('\n'))
+    }
+
+    const instructionLines = flattenJsonLdInstructions(recipeMetadata.recipeInstructions)
+    if (instructionLines.length > 0) {
+      structuredParts.push('INSTRUCTIONS (SCHEMA):\n' + instructionLines.join('\n'))
+    }
+
+    if (structuredParts.length > 0) {
+      metadataText += `${metadataText ? '\n' : '\n\n'}STRUCTURED RECIPE DATA:\n${structuredParts.join('\n\n')}\n`
+    }
+  }
+  
+  // Also look for nutrition in the page HTML - extract nutrition facts tables
+  // Do this BEFORE removing script tags so we can find tables
+  const nutritionTables = $('table[class*="nutrition"], .nutrition-facts, [class*="nutrition-info"], [id*="nutrition"], [class*="nutritional"], [data-nutrition]')
+  if (nutritionTables.length > 0 && !metadataText.includes('Nutrition')) {
+    nutritionTables.each((_, table) => {
+      const tableText = $(table).text()
+      const calMatch = tableText.match(/calories?[:\s]+(\d+)/i)
+      const protMatch = tableText.match(/protein[:\s]+([\d.]+)\s*g/i)
+      const fatMatch = tableText.match(/fat[:\s]+([\d.]+)\s*g/i)
+      const carbsMatch = tableText.match(/(?:carb|carbohydrate)[:\s]+([\d.]+)\s*g/i)
+      
+      const extraParts: string[] = []
+      if (calMatch) extraParts.push(`Calories: ${calMatch[1]}`)
+      if (protMatch) extraParts.push(`Protein: ${protMatch[1]}g`)
+      if (fatMatch) extraParts.push(`Fat: ${fatMatch[1]}g`)
+      if (carbsMatch) extraParts.push(`Carbs: ${carbsMatch[1]}g`)
+      
+      if (extraParts.length > 0) {
+        if (!metadataText) {
+          metadataText = '\n\nRECIPE METADATA:\n'
+        }
+        metadataText += `Nutrition (per serving): ${extraParts.join(', ')}\n`
+        return false // break after first match
+      }
+    })
+  }
+  
   const mainContent = $('main, article, [role="main"], .content, .post-content, .entry-content').first()
-  const contentToExtract = mainContent.length > 0 ? mainContent : $.root()
+  const fallbackRoot = $('body').length > 0 ? $('body') : $.root()
+  const rawContentHtml = mainContent.length > 0
+    ? mainContent.html() || ''
+    : fallbackRoot.html() || html
   
-  // Extract text, limit to 8000 characters to avoid token limits
-  let text = contentToExtract.text()
+  const $content = cheerio.load(rawContentHtml || '')
   
-  // Clean up whitespace
-  text = text.replace(/\s+/g, ' ').trim()
+  $content('script, style, noscript').remove()
+  $content('br').replaceWith('\n')
   
-  // Limit length
+  $content('h1, h2, h3, h4, h5, h6').each((_, element) => {
+    const headingText = $content(element).text().replace(/\s+/g, ' ').trim()
+    if (!headingText) {
+      $content(element).remove()
+      return
+    }
+    $content(element).replaceWith(`\n\n=== ${headingText} ===\n`)
+  })
+  
+  const headingLikeSelectors = ['p', 'div', 'section', 'article']
+  headingLikeSelectors.forEach((selector) => {
+    $content(selector).each((_, el) => {
+      const $el = $content(el)
+      const elementText = $el.text().replace(/\s+/g, ' ').trim()
+      if (!elementText) {
+        $el.remove()
+        return
+      }
+      if ($el.children().length === 1) {
+        const firstChild = $el.children().first()
+        const firstChildNode = firstChild.get(0) as cheerio.Element | undefined
+        const tagName = (firstChildNode?.name || '').toLowerCase()
+        const childText = firstChild.text().replace(/\s+/g, ' ').trim()
+        if (childText && childText === elementText && ['strong', 'b'].includes(tagName)) {
+          $el.replaceWith(`\n\n=== ${childText} ===\n`)
+        }
+      }
+    })
+  })
+  
+  $content('ul, ol').each((_, list) => {
+    const $list = $content(list)
+    const items: string[] = []
+    const tagName = (($list.get(0) as cheerio.Element)?.name || '').toLowerCase()
+    const isOrdered = tagName === 'ol'
+    
+    $list.children('li').each((idx, li) => {
+      const itemText = $content(li).text().replace(/\s+/g, ' ').trim()
+      if (!itemText) return
+      const prefix = isOrdered ? `${idx + 1}. ` : '- '
+      items.push(`${prefix}${itemText}`)
+    })
+    
+    if (items.length > 0) {
+      $list.replaceWith(`\n${items.join('\n')}\n`)
+    } else {
+      $list.remove()
+    }
+  })
+  
+  // Convert remaining paragraphs to explicit lines
+  $content('p').each((_, paragraph) => {
+    const $paragraph = $content(paragraph)
+    const text = $paragraph.text().replace(/\s+/g, ' ').trim()
+    if (!text) {
+      $paragraph.remove()
+      return
+    }
+    $paragraph.replaceWith(`\n${text}\n`)
+  })
+  
+  let text = $content.root().text()
+  text = text.replace(/\u00a0/g, ' ')
+  text = text.replace(/\r/g, '')
+  text = text.replace(/[ \t]+\n/g, '\n')
+  text = text.replace(/\n[ \t]+/g, '\n')
+  text = text.replace(/\n{3,}/g, '\n\n')
+  text = text.replace(/[ \t]{2,}/g, ' ')
+  text = text.trim()
+  
+  if (metadataText) {
+    text = `${metadataText}${text}`
+  }
+  
   if (text.length > 8000) {
     text = text.substring(0, 8000) + '...'
   }
@@ -192,62 +469,236 @@ function extractTextFromHTML(html: string): string {
  * Extract recipe using GPT-4o Mini with structured prompt
  */
 async function extractRecipeWithAI(content: string, contentType: 'html' | 'text' | 'image_ocr'): Promise<RecipeExtraction> {
-  const systemPrompt = `You are an expert recipe extraction assistant. Extract structured recipe information from the provided content.
+  const systemPrompt = `You are the CookieJar Recipe AI Assistant. Your job is to take a user-submitted recipe (ingredients + instructions + optional metadata) and normalize it into CookieJar's structured format.
 
-You MUST return a valid JSON object with the following structure:
+### RULES:
+
+1. **NEVER change existing instructions.**
+   - If instructions are present (even if messy or poorly formatted), ONLY clean, reformat, and restructure them.
+   - NEVER remove steps, reorder steps, change quantities mentioned, or alter the content.
+   - Preserve the exact meaning and sequence of what the user provided.
+
+2. **Generate instructions ONLY if they are completely missing or extremely minimal.**
+   - If instructions are missing or very incomplete (e.g., just "bake at 350" with no other steps), generate detailed, comprehensive instructions based on the ingredients and recipe title.
+   - Generated instructions MUST be thorough and step-by-step, not just high-level summaries.
+   - Include all necessary steps: preparation, mixing/combining ingredients, cooking/baking methods, temperatures, times, and finishing steps.
+   - Break down complex steps into clear, actionable instructions (e.g., don't just say "mix the batter" - specify what to mix, in what order, and how).
+   - Use standard cooking techniques and logical steps based on the ingredients provided.
+   - This is the ONLY case where you should generate new content.
+
+3. **NEVER remove quantities, reorder steps, or change values from existing instructions.**
+
+4. **SECTION GROUPS (CRITICAL)** 
+   - When the source recipe uses subheadings like "For the crust", "Make the filling", or "Assembly", preserve them as distinct ingredientSections and instructionSections in the same order.
+   - Section titles may appear as headings, bold/strong lines before lists, or JSON-LD HowToSection names—capture the exact wording (punctuation and casing).
+   - Attach ingredients/steps to the most recent heading. Only invent a generic heading if multiple groups are clearly separated but unlabeled.
+
+5. **If the user wants changes (e.g., 'use 0.5 tbsp coconut oil'), you MUST:**
+   - Confirm the specific change
+   - Apply ONLY that change to the original recipe
+   - Return the final structured JSON for storage
+
+6. **OUTPUT FORMAT (ALWAYS)**
+Include ALL fields that have values. Omit optional fields if not found. Use null for explicitly empty values.
 {
-  "title": "Recipe title (required)",
-  "description": "Brief description of the recipe (infer if missing)",
-  "sourceUrl": "Original URL if available (null if not)",
-  "image": "Image URL if available (null if not)",
-  "servings": 4 (number, infer reasonable default if missing),
-  "prepTime": "15 minutes" (string format, infer if missing),
-  "cookTime": "30 minutes" (string format, infer if missing),
-  "totalTime": "45 minutes" (string format, infer if missing),
-  "cuisine": "Italian" (string, infer from ingredients/name if missing),
-  "mealType": "dinner" (one of: breakfast, lunch, dinner, snack, dessert, drink, infer if missing),
+  "title": "Recipe Title (REQUIRED)",
+  "description": "Recipe description if present, otherwise omit",
+  "sourceUrl": "Original URL if provided, otherwise omit",
+  "image": "Image URL if found, otherwise omit",
+  "servings": 4,
+  "prepTime": "15 minutes",
+  "cookTime": "30 minutes",
+  "totalTime": "45 minutes",
+  "cuisine": "Italian",
+  "mealType": "dinner",
   "nutrition": {
-    "calories": 350 (number, infer reasonable estimate if missing),
-    "protein": 25.5 (number in grams, infer if missing),
-    "fat": 12.3 (number in grams, infer if missing),
-    "carbs": 30.2 (number in grams, infer if missing)
+    "calories": 250,
+    "protein": 10.5,
+    "fat": 8.0,
+    "carbs": 35.0
   },
   "ingredientSections": [
-    {
-      "section": "FOR THE SAUCE" (optional, null if no section),
-      "items": ["1 cup tomatoes", "2 cloves garlic", ...]
-    }
+    { "section": "For the dough", "items": ["2 cups flour", "1 cup water"] }
   ],
   "instructionSections": [
-    {
-      "section": "PREPARATION" (optional, null if no section),
-      "steps": ["Step 1...", "Step 2...", ...]
-    }
+    { "section": "Preparation", "steps": ["Step 1", "Step 2"] }
   ],
-  "tags": ["italian", "pasta", "vegetarian", ...] (array of relevant tags)
+  "tags": ["tag1", "tag2"]
 }
 
-IMPORTANT:
-- Extract ALL visible recipe information
-- Infer missing fields with reasonable defaults based on recipe type
-- For nutrition, provide realistic estimates based on ingredients if not provided
-- For servings, infer from ingredient quantities if not specified
-- For times, infer from cooking methods if not specified
-- Preserve ingredient and instruction sections if present
-- Generate relevant tags (cuisine, dietary, cooking method, etc.)
-- Return ONLY valid JSON, no markdown, no explanations`
+**IMPORTANT FOR NUTRITION**: 
+1. If you find nutrition information in the content, extract it and include the nutrition object.
+2. If nutrition is NOT found in the content, CALCULATE it from the ingredients:
+   - Sum up estimated nutrition for all ingredients
+   - Divide by number of servings
+   - Round appropriately (calories to nearest 5-10, macros to nearest 0.5-1g)
+   - Include the calculated nutrition object
+3. Even if only one value is found or calculated, still include the nutrition object with that value.
+
+Examples:
+- If you see "250 calories per serving" → {"nutrition": {"calories": 250}}
+- If you see "Calories: 250, Protein: 10g" → {"nutrition": {"calories": 250, "protein": 10}}
+- If you see a nutrition table with all values → include all in the nutrition object
+- If NO nutrition found but you have ingredients and servings → calculate and include {"nutrition": {"calories": 205, "protein": 2, "fat": 8, "carbs": 33}}
+
+7. **If instructions are messy but present**, rewrite them cleanly while preserving all steps and content exactly as provided.
+
+8. **If the user submits images**, extract OCR → format the extracted text.
+
+9. **Be warm, helpful, and funny, but NEVER change existing recipe content.**
+
+10. **METADATA EXTRACTION (CRITICAL)**: Extract ALL available metadata from the content:
+   - **description**: Recipe description or summary if present
+   - **servings**: Number of servings (extract the number, e.g., "Serves 4" → 4, "Makes 12" → 12)
+   - **prepTime**: Preparation time (e.g., "15 minutes", "PT15M", "15 mins", "2 hours")
+   - **cookTime**: Cooking time (e.g., "30 minutes", "PT30M", "30 mins", "20 mins")
+   - **totalTime**: Total time if explicitly stated, otherwise calculate from prepTime + cookTime
+   - **cuisine**: Cuisine type if mentioned (e.g., "Italian", "Mexican", "Asian", "American")
+   - **mealType**: Meal type if mentioned (e.g., "breakfast", "lunch", "dinner", "dessert", "snack")
+   - **nutrition**: Extract or CALCULATE nutrition facts - THIS IS VERY IMPORTANT:
+     
+     **STEP 1: Try to extract from content first**
+     - Look for "Calories: 250" or "250 calories" or "250 kcal"
+     - Look for "Protein: 10g" or "10g protein" or "Protein 10 grams"
+     - Look for "Fat: 8g" or "8g fat" or "Fat 8 grams"
+     - Look for "Carbs: 35g" or "35g carbs" or "Carbohydrates 35 grams"
+     - Look for nutrition facts tables, nutrition labels, or nutrition information sections
+     - Extract numbers even if format varies (e.g., "250 cal", "10 g protein", etc.)
+     - Always extract per-serving values
+     
+     **STEP 2: If nutrition is NOT found, CALCULATE it from ingredients**
+     - Use your knowledge of ingredient nutrition to estimate:
+       * For each ingredient, estimate calories, protein, fat, and carbs per unit
+       * Consider the quantity/amount specified (e.g., "2 cups flour", "1 tbsp butter")
+       * Sum up all ingredients' nutrition values
+       * Divide by the number of servings to get per-serving values
+     - Example calculation approach:
+       * "2 cups all-purpose flour" ≈ 900 calories, 25g protein, 2g fat, 190g carbs
+       * "1 cup sugar" ≈ 770 calories, 0g protein, 0g fat, 200g carbs
+       * "1/2 cup butter" ≈ 800 calories, 1g protein, 90g fat, 0g carbs
+       * Total: 2470 calories, 26g protein, 92g fat, 390g carbs
+       * For 12 servings: 206 calories, 2.2g protein, 7.7g fat, 32.5g carbs per serving
+     - Round to reasonable numbers (calories to nearest 5-10, macros to nearest 0.5-1g)
+     - Be reasonable with estimates - it's better to be approximately right than missing
+     
+     **ALWAYS include nutrition object if you can extract OR calculate it**
+   - **image**: Recipe image URL if present in the content
+   - **sourceUrl**: Original source URL if provided
+   
+   Extract metadata that is EXPLICITLY stated in the content. Look for common patterns like:
+   - "Serves 4" or "Makes 4 servings" or "Yield: 4"
+   - "Prep time: 15 minutes" or "Preparation: 15 mins" or "Prep: 2 hours"
+   - "Cook time: 30 minutes" or "Cooking: 30 mins" or "Cook: 20 mins"
+   - "Total time: 45 minutes" or "Total: 2 hours 20 mins"
+   - Nutrition facts tables, nutrition labels, or sections with "Nutrition" in the heading
+   - "Calories: 250 per serving" or "250 calories per serving" or "250 kcal"
+   - "Protein: 10g" or "10 grams protein" or "Protein 10g"
+   - "Fat: 8g" or "8 grams fat" or "Total fat 8g"
+   - "Carbs: 35g" or "35 grams carbs" or "Carbohydrates 35g"
+   - "Cuisine: Italian" or mentions in description
+
+11. **For tags**: Generate tags based on what's actually in the recipe (ingredients, cooking methods mentioned, etc.), but keep them relevant and accurate.
+
+Return ONLY valid JSON, no markdown, no explanations.`
 
   const userPrompt = contentType === 'html'
     ? `Extract the recipe from this HTML content. Focus on the main recipe content and ignore navigation, ads, and other page elements.
 
+IMPORTANT: 
+1. If instructions exist, preserve them exactly (only clean formatting). If instructions are completely missing or extremely minimal, generate detailed, comprehensive step-by-step instructions based on the ingredients - include all preparation, mixing, cooking, and finishing steps with specific details.
+
+2. Extract ALL available metadata from the page:
+   - Recipe description/summary
+   - Servings (look for "Serves X", "Makes X servings", "Yield: X", etc.)
+   - Prep time, cook time, and total time
+   - Cuisine type and meal type if mentioned
+   - **Nutrition information (CRITICAL)**: 
+     * FIRST: Look carefully for nutrition facts in the content:
+       - Nutrition facts tables or nutrition labels
+       - Text like "Calories: 250" or "250 calories per serving"
+       - "Protein: 10g" or "10g protein"
+       - "Fat: 8g" or "8g fat" or "Total fat 8g"
+       - "Carbs: 35g" or "35g carbs" or "Carbohydrates 35g"
+       - Any section with "Nutrition" in the heading
+       - Extract the numbers even if the format varies
+     * SECOND: If nutrition is NOT found, CALCULATE it from the ingredients:
+       - Estimate nutrition for each ingredient based on quantities
+       - Sum all ingredients' nutrition values
+       - Divide by number of servings to get per-serving values
+       - Round appropriately (calories to nearest 5-10, macros to nearest 0.5-1g)
+       - Always include calculated nutrition if you have ingredients and servings
+   - Recipe image URL
+   - Any other metadata fields that are explicitly stated
+
+3. SECTION GROUPS (CRITICAL):
+   - Detect ingredient and instruction subheadings (headings, bold/strong lines before lists, JSON-LD HowToSection names, etc.) and output them as the \`section\` field.
+   - Keep the original order, casing, and punctuation of each heading.
+   - Attach each list/step to the most recent heading. Only invent a short descriptive heading when separate blocks are clearly unlabeled.
+
 HTML Content:
 ${content.substring(0, 8000)}`
     : contentType === 'image_ocr'
-    ? `Extract the recipe from this OCR text extracted from an image. The text may have formatting issues, so be flexible in parsing.
+    ? `Extract the recipe from this OCR text extracted from an image. The text may have formatting issues, handwriting artifacts, or screenshot formatting - be flexible and intelligent in parsing.
+
+Handle:
+- Handwritten notes with messy formatting
+- Screenshots with mixed text layouts
+- Missing or unclear section headers
+- Inconsistent spacing and line breaks
+- Nutrition facts embedded in text (extract macros if present)
+
+IMPORTANT: 
+1. If instructions exist, preserve them exactly (only clean formatting). If instructions are completely missing or extremely minimal, generate detailed, comprehensive step-by-step instructions based on the ingredients - include all preparation, mixing, cooking, and finishing steps with specific details.
+
+2. Extract ALL available metadata from the text:
+   - Recipe description/summary
+   - Servings (look for "Serves X", "Makes X servings", etc.)
+   - Prep time, cook time, and total time
+   - Cuisine type and meal type if mentioned
+   - **Nutrition information (CRITICAL)**:
+     * FIRST: Look for nutrition facts in the text (calories, protein, fat, carbs per serving)
+     * SECOND: If NOT found, CALCULATE from ingredients:
+       - Estimate nutrition for each ingredient based on quantities
+       - Sum all ingredients' nutrition values
+       - Divide by number of servings to get per-serving values
+       - Round appropriately and include calculated nutrition
+   - Any other metadata fields that are explicitly stated
+
+3. SECTION GROUPS (CRITICAL):
+   - Use headings, bolded lines, or obvious separators in the OCR text to determine ingredient/instruction sections.
+   - Preserve the exact wording/casing for each heading and keep sections in order.
+   - If multiple blocks are clearly separate but unlabeled, infer a short descriptive heading (e.g., "Topping", "Assembly") instead of leaving sections blank.
 
 OCR Text:
 ${content.substring(0, 8000)}`
-    : `Extract the recipe from this pasted text content.
+    : `Extract the recipe from this pasted text content. The text may be from any source: copied recipes, handwritten notes converted to text, screenshots, etc.
+
+Handle:
+- Any text format, even if messy or poorly structured
+- Auto-detect sections even if not explicitly labeled
+- Extract nutrition/macros from text if mentioned
+
+IMPORTANT: 
+1. If instructions exist, preserve them exactly (only clean formatting). If instructions are completely missing or extremely minimal, generate detailed, comprehensive step-by-step instructions based on the ingredients - include all preparation, mixing, cooking, and finishing steps with specific details.
+
+2. Extract ALL available metadata from the text:
+   - Recipe description/summary
+   - Servings (look for "Serves X", "Makes X servings", etc.)
+   - Prep time, cook time, and total time
+   - Cuisine type and meal type if mentioned
+   - **Nutrition information (CRITICAL)**:
+     * FIRST: Look for nutrition facts in the text (calories, protein, fat, carbs per serving)
+     * SECOND: If NOT found, CALCULATE from ingredients:
+       - Estimate nutrition for each ingredient based on quantities
+       - Sum all ingredients' nutrition values
+       - Divide by number of servings to get per-serving values
+       - Round appropriately and include calculated nutrition
+   - Any other metadata fields that are explicitly stated
+
+3. SECTION GROUPS (CRITICAL):
+   - Look for headings, bold/uppercase lines, obvious separators, or JSON-style section labels and map them to ingredient/instruction sections.
+   - Keep the heading text exactly as provided, in the same order.
+   - Only create a new heading if the content clearly contains multiple unlabeled groups that would confuse the user without a label.
 
 Text Content:
 ${content.substring(0, 8000)}`
@@ -292,6 +743,8 @@ ${content.substring(0, 8000)}`
       throw new Error('No valid JSON found in AI response')
     }
   }
+
+  // Note: We no longer check for errors here since we allow generating instructions when missing
 
   // Validate with zod schema
   const validated = RecipeExtractionSchema.parse(parsed)
@@ -455,14 +908,14 @@ export async function POST(req: Request) {
           messages: [
             {
               role: 'system',
-              content: 'You are an OCR assistant. Extract all text from the image, preserving the structure and formatting as much as possible. Return only the extracted text, no explanations.',
+              content: 'You are an expert OCR assistant specialized in recipe extraction. Extract all text from the image, preserving structure and formatting. Handle handwritten notes, screenshots, and printed recipes with equal accuracy.',
             },
             {
               role: 'user',
               content: [
                 {
                   type: 'text',
-                  text: 'Extract all text from this recipe image. Preserve the structure - include ingredient lists, instructions, and any other recipe information. Return only the text content.',
+                  text: 'Extract all text from this recipe image. This may be a handwritten note, screenshot, cookbook photo, or printed recipe card. Preserve the structure - include ingredient lists, instructions, nutrition facts, and any other recipe information. Handle messy formatting, unclear handwriting, and mixed layouts intelligently. Return only the extracted text content.',
                 },
                 {
                   type: 'image_url',
@@ -474,7 +927,7 @@ export async function POST(req: Request) {
             },
           ],
           temperature: 0.1,
-          max_tokens: 2000,
+          max_tokens: 3000, // Increased for longer recipes
         })
 
         const visionText = visionResponse.choices[0]?.message?.content

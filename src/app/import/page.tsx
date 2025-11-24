@@ -34,7 +34,8 @@ export default function ImportPage() {
     setSuccess(false)
 
     try {
-      const res = await fetch('/api/recipes/import-from-url', {
+      // Use the AI-first import endpoint for better extraction
+      const res = await fetch('/api/import/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -51,13 +52,13 @@ export default function ImportPage() {
         return
       }
 
-      // Success - show message briefly then redirect
+      // Success - redirect to recipe page
       setSuccess(true)
       setLoading(false)
       
-      // Redirect to homepage after a short delay
+      // Redirect to recipe page after a short delay
       setTimeout(() => {
-        router.push('/')
+        router.push(`/recipes/${data.data.id}`)
       }, 1500)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
@@ -150,7 +151,8 @@ export default function ImportPage() {
           }}>
             <p className="text-sm leading-relaxed" style={{ color: 'var(--text-main)' }}>
               <strong>How it works:</strong> Paste a recipe URL from any cooking website. 
-              We'll automatically extract the recipe title, ingredients, and instructions and add it to your Cookie Jar.
+              We'll automatically extract the recipe title, ingredients, instructions, nutrition info, and auto-generate tags. 
+              The AI-powered importer works with any site and intelligently structures everything perfectly.
             </p>
           </div>
         </section>

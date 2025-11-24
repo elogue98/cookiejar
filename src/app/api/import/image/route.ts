@@ -57,14 +57,14 @@ async function extractOCRTextFromImage(imageBuffer: Buffer, mimeType: string): P
     messages: [
       {
         role: 'system',
-        content: 'You are an OCR assistant. Extract all text from the image, preserving the structure and formatting as much as possible. Return only the extracted text, no explanations.',
+        content: 'You are an expert OCR assistant specialized in recipe extraction. Extract all text from the image, preserving structure and formatting. Handle handwritten notes, screenshots, and printed recipes with equal accuracy.',
       },
       {
         role: 'user',
         content: [
           {
             type: 'text',
-            text: 'Extract all text from this recipe image. Preserve the structure - include ingredient lists, instructions, and any other recipe information. Return only the text content.',
+            text: 'Extract all text from this recipe image. This may be a handwritten note, screenshot, cookbook photo, or printed recipe card. Preserve the structure - include ingredient lists, instructions, nutrition facts, and any other recipe information. Handle messy formatting, unclear handwriting, and mixed layouts intelligently. Return only the extracted text content.',
           },
           {
             type: 'image_url',
@@ -76,7 +76,7 @@ async function extractOCRTextFromImage(imageBuffer: Buffer, mimeType: string): P
       }
     ],
     temperature: 0.1,
-    max_tokens: 2000,
+    max_tokens: 3000, // Increased for longer recipes
   })
 
   const content = response.choices[0]?.message?.content
@@ -91,62 +91,85 @@ async function extractOCRTextFromImage(imageBuffer: Buffer, mimeType: string): P
  * Extract recipe using AI (same function as in /api/import/ai)
  */
 async function extractRecipeWithAI(content: string, contentType: 'html' | 'text' | 'image_ocr'): Promise<RecipeExtraction> {
-  const systemPrompt = `You are an expert recipe extraction assistant. Extract structured recipe information from the provided content.
+  const systemPrompt = `You are the CookieJar Recipe AI Assistant. Your job is to take a user-submitted recipe (ingredients + instructions + optional metadata) and normalize it into CookieJar's structured format.
 
-You MUST return a valid JSON object with the following structure:
+### RULES:
+
+1. **NEVER change existing instructions.**
+   - If instructions are present (even if messy or poorly formatted), ONLY clean, reformat, and restructure them.
+   - NEVER remove steps, reorder steps, change quantities mentioned, or alter the content.
+   - Preserve the exact meaning and sequence of what the user provided.
+
+2. **Generate instructions ONLY if they are completely missing or extremely minimal.**
+   - If instructions are missing or very incomplete (e.g., just "bake at 350" with no other steps), generate detailed, comprehensive instructions based on the ingredients and recipe title.
+   - Generated instructions MUST be thorough and step-by-step, not just high-level summaries.
+   - Include all necessary steps: preparation, mixing/combining ingredients, cooking/baking methods, temperatures, times, and finishing steps.
+   - Break down complex steps into clear, actionable instructions (e.g., don't just say "mix the batter" - specify what to mix, in what order, and how).
+   - Use standard cooking techniques and logical steps based on the ingredients provided.
+   - This is the ONLY case where you should generate new content.
+
+3. **NEVER remove quantities, reorder steps, or change values from existing instructions.**
+
+4. **If the user wants changes (e.g., 'use 0.5 tbsp coconut oil'), you MUST:**
+   - Confirm the specific change
+   - Apply ONLY that change to the original recipe
+   - Return the final structured JSON for storage
+
+5. **OUTPUT FORMAT (ALWAYS)**
 {
-  "title": "Recipe title (required)",
-  "description": "Brief description of the recipe (infer if missing)",
-  "sourceUrl": "Original URL if available (null if not)",
-  "image": "Image URL if available (null if not)",
-  "servings": 4 (number, infer reasonable default if missing),
-  "prepTime": "15 minutes" (string format, infer if missing),
-  "cookTime": "30 minutes" (string format, infer if missing),
-  "totalTime": "45 minutes" (string format, infer if missing),
-  "cuisine": "Italian" (string, infer from ingredients/name if missing),
-  "mealType": "dinner" (one of: breakfast, lunch, dinner, snack, dessert, drink, infer if missing),
-  "nutrition": {
-    "calories": 350 (number, infer reasonable estimate if missing),
-    "protein": 25.5 (number in grams, infer if missing),
-    "fat": 12.3 (number in grams, infer if missing),
-    "carbs": 30.2 (number in grams, infer if missing)
-  },
+  "title": "",
+  "description": "",
   "ingredientSections": [
-    {
-      "section": "FOR THE SAUCE" (optional, null if no section),
-      "items": ["1 cup tomatoes", "2 cloves garlic", ...]
-    }
+    { "section": "", "items": [] }
   ],
   "instructionSections": [
-    {
-      "section": "PREPARATION" (optional, null if no section),
-      "steps": ["Step 1...", "Step 2...", ...]
-    }
+    { "section": "", "steps": [] }
   ],
-  "tags": ["italian", "pasta", "vegetarian", ...] (array of relevant tags)
+  "tags": [],
+  "extras": {}
 }
 
-IMPORTANT:
-- Extract ALL visible recipe information
-- Infer missing fields with reasonable defaults based on recipe type
-- For nutrition, provide realistic estimates based on ingredients if not provided
-- For servings, infer from ingredient quantities if not specified
-- For times, infer from cooking methods if not specified
-- Preserve ingredient and instruction sections if present
-- Generate relevant tags (cuisine, dietary, cooking method, etc.)
-- Return ONLY valid JSON, no markdown, no explanations`
+6. **If instructions are messy but present**, rewrite them cleanly while preserving all steps and content exactly as provided.
+
+7. **If the user submits images**, extract OCR → format the extracted text.
+
+8. **Be warm, helpful, and funny, but NEVER change existing recipe content.**
+
+9. **For metadata (servings, prepTime, cookTime, etc.)**: Only extract if explicitly present in the content. Do not infer or estimate.
+
+10. **For tags**: Generate tags based on what's actually in the recipe (ingredients, cooking methods mentioned, etc.), but keep them relevant and accurate.
+
+Return ONLY valid JSON, no markdown, no explanations.`
 
   const userPrompt = contentType === 'image_ocr'
-    ? `Extract the recipe from this OCR text extracted from an image. The text may have formatting issues, so be flexible in parsing.
+    ? `Extract the recipe from this OCR text extracted from an image. The text may have formatting issues, handwriting artifacts, or screenshot formatting - be flexible and intelligent in parsing.
+
+Handle:
+- Handwritten notes with messy formatting
+- Screenshots with mixed text layouts
+- Missing or unclear section headers
+- Inconsistent spacing and line breaks
+- Nutrition facts embedded in text (extract macros if present)
+
+IMPORTANT: If instructions exist, preserve them exactly (only clean formatting). If instructions are completely missing or extremely minimal, generate detailed, comprehensive step-by-step instructions based on the ingredients - include all preparation, mixing, cooking, and finishing steps with specific details.
 
 OCR Text:
 ${content.substring(0, 8000)}`
     : contentType === 'html'
     ? `Extract the recipe from this HTML content. Focus on the main recipe content and ignore navigation, ads, and other page elements.
 
+IMPORTANT: If instructions exist, preserve them exactly (only clean formatting). If instructions are completely missing or extremely minimal, generate detailed, comprehensive step-by-step instructions based on the ingredients - include all preparation, mixing, cooking, and finishing steps with specific details.
+
 HTML Content:
 ${content.substring(0, 8000)}`
-    : `Extract the recipe from this pasted text content.
+    : `Extract the recipe from this pasted text content. The text may be from any source: copied recipes, handwritten notes converted to text, screenshots, etc.
+
+Handle:
+- Any text format, even if messy or poorly structured
+- Auto-detect sections even if not explicitly labeled
+- Extract nutrition/macros from text if mentioned
+
+IMPORTANT: If instructions exist, preserve them exactly (only clean formatting). If instructions are completely missing or extremely minimal, generate detailed, comprehensive step-by-step instructions based on the ingredients - include all preparation, mixing, cooking, and finishing steps with specific details.
 
 Text Content:
 ${content.substring(0, 8000)}`
@@ -191,6 +214,8 @@ ${content.substring(0, 8000)}`
       throw new Error('No valid JSON found in AI response')
     }
   }
+
+  // Note: We no longer check for errors here since we allow generating instructions when missing
 
   // Validate with zod schema
   const validated = RecipeExtractionSchema.parse(parsed)

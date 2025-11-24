@@ -20,6 +20,21 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Environment Variables
+
+Copy `.env.local` from the example below (or run `cp .env.local.example .env.local` once you create one) and fill it with your real credentials before running the app locally or on Vercel:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+OPENAI_API_KEY=your-openai-key
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL_FALLBACK=gpt-4o
+```
+
+These values are required because the frontend talks directly to Supabase and the backend API routes call OpenAI for recipe imports and tagging.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

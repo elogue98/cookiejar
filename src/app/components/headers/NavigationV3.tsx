@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Logo from '@/app/components/Logo'
 import { useUser } from '@/lib/userContext'
 
-export default function Navigation() {
+export default function NavigationV3() {
   const router = useRouter()
   const { user, logoutUser } = useUser()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -37,7 +37,7 @@ export default function Navigation() {
   }
 
   return (
-    <header className="bg-[#F9E7B2] shadow-sm sticky top-0 z-50 transition-all duration-300" style={{ borderBottom: '1px solid rgba(211, 78, 78, 0.1)' }}>
+    <header className="bg-white shadow-sm sticky top-0 z-50 transition-all duration-300">
       <nav aria-label="Global" className="mx-auto flex max-w-7xl items-center justify-between p-6 lg:px-8">
         
         {/* Left: Logo */}
@@ -164,7 +164,7 @@ export default function Navigation() {
       {mobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm transition-opacity" onClick={() => setMobileMenuOpen(false)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto bg-[#F9E7B2] p-6 sm:max-w-sm shadow-2xl transform transition-transform duration-300">
+          <div className="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto bg-white p-6 sm:max-w-sm shadow-2xl transform transition-transform duration-300">
             <div className="flex items-center justify-between mb-8">
               <Link href="/" className="-m-1.5 p-1.5 flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
                 <Logo size={32} />
@@ -255,3 +255,4 @@ export default function Navigation() {
     </header>
   )
 }
+
