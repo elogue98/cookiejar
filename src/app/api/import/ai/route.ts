@@ -8,6 +8,7 @@ import {
   normalizeInstructionSections,
   formatMetadataForNotes,
 } from '@/lib/recipeFormatting'
+import { generateTagsForRecipe } from '@/lib/aiTagging'
 import OpenAI from 'openai'
 import * as cheerio from 'cheerio'
 
@@ -1230,7 +1231,41 @@ export async function POST(req: Request) {
     const ingredients = normalizeIngredientSections(extractedRecipe.ingredientSections)
     const instructions = normalizeInstructionSections(extractedRecipe.instructionSections)
     const metadataNotes = formatMetadataForNotes(extractedRecipe)
-    const tags = extractedRecipe.tags || []
+
+    const normalizeTag = (tag: unknown) =>
+      typeof tag === 'string' ? tag.toLowerCase().trim().replace(/\s+/g, ' ') : ''
+
+    const ingredientsForTagging = ingredients.flatMap((section) => section.items)
+    const instructionsForTagging = instructions
+      .map((section) => {
+        const prefix = section.section ? `${section.section}: ` : ''
+        return `${prefix}${section.steps.join(' ')}`
+      })
+      .join('\n')
+
+    let tags = Array.from(
+      new Set(
+        (extractedRecipe.tags || [])
+          .map((tag) => normalizeTag(tag))
+          .filter((tag) => tag.length > 0)
+      )
+    )
+
+    if (tags.length === 0) {
+      try {
+        const fallbackTags = await generateTagsForRecipe({
+          title: extractedRecipe.title,
+          ingredients: ingredientsForTagging,
+          instructions: instructionsForTagging,
+        })
+
+        if (fallbackTags.length > 0) {
+          tags = Array.from(new Set([...tags, ...fallbackTags.map((tag) => normalizeTag(tag))]))
+        }
+      } catch (tagError) {
+        console.error('Error generating fallback tags for imported recipe:', tagError)
+      }
+    }
 
     const recipeData: any = {
       title: extractedRecipe.title,

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, ReactNode } from 'react'
+import { useState, useMemo, ReactNode, useEffect, useRef } from 'react'
 
 interface IngredientGroup {
   section: string
@@ -374,6 +374,8 @@ function mapIngredientsToSteps(ingredients: IngredientGroup[], instructions: Ins
 
 export default function RecipeInteractionWrapper({ ingredients, instructions, children }: RecipeInteractionWrapperProps) {
   const [activeStepId, setActiveStepId] = useState<string | null>(null)
+  const ingredientRefs = useRef<Record<string, HTMLLIElement | null>>({})
+  const ingredientContainerRef = useRef<HTMLElement | null>(null)
   
   // Memoize the mapping so it's only calculated once on load
   const normalizedIngredients = useMemo(() => normalizeIngredientGroups(ingredients), [ingredients])
@@ -383,6 +385,39 @@ export default function RecipeInteractionWrapper({ ingredients, instructions, ch
   const ingredientMapping = useMemo(() => {
     return mapIngredientsToSteps(normalizedIngredients, normalizedInstructions)
   }, [normalizedIngredients, normalizedInstructions])
+
+  useEffect(() => {
+    ingredientRefs.current = {}
+  }, [normalizedIngredients])
+
+  useEffect(() => {
+    if (!activeStepId) return
+    const matchedIds = ingredientMapping[activeStepId]
+    if (!matchedIds || matchedIds.length === 0) return
+    const container = ingredientContainerRef.current
+    if (!container) return
+
+    const firstExistingId = matchedIds.find((id) => ingredientRefs.current[id])
+    if (!firstExistingId) return
+    const node = ingredientRefs.current[firstExistingId]
+    if (!node) return
+
+    const containerRect = container.getBoundingClientRect()
+    const nodeRect = node.getBoundingClientRect()
+    const isVisible =
+      nodeRect.top >= containerRect.top &&
+      nodeRect.bottom <= containerRect.bottom
+
+    if (isVisible) return
+
+    const scrollAdjustment =
+      nodeRect.top - containerRect.top - containerRect.height / 2 + nodeRect.height / 2
+
+    container.scrollTo({
+      top: container.scrollTop + scrollAdjustment,
+      behavior: 'smooth',
+    })
+  }, [activeStepId, ingredientMapping])
 
   // Helper to check if an ingredient is highlighted
   const isIngredientHighlighted = (groupIdx: number, itemIdx: number) => {
@@ -396,7 +431,10 @@ export default function RecipeInteractionWrapper({ ingredients, instructions, ch
   return (
     <div className="flex flex-col lg:flex-row min-h-[calc(100vh-100px)]">
       {/* LEFT COLUMN: Ingredients + Sidebar Top */}
-      <aside className="w-full lg:w-[400px] xl:w-[450px] lg:h-[calc(100vh-100px)] lg:sticky lg:top-[60px] lg:overflow-y-auto bg-slate-50 border-r border-slate-200 p-6 md:p-8 flex flex-col gap-8 z-10">
+      <aside
+        ref={ingredientContainerRef}
+        className="w-full lg:w-[400px] xl:w-[450px] lg:h-[calc(100vh-100px)] lg:sticky lg:top-[60px] lg:overflow-y-auto bg-slate-50 border-r border-slate-200 p-6 md:p-8 flex flex-col gap-8 z-10"
+      >
          {children?.sidebarTop}
 
          {/* Ingredients List */}
@@ -416,6 +454,9 @@ export default function RecipeInteractionWrapper({ ingredients, instructions, ch
                               ? 'bg-red-50 text-[#D34E4E] font-medium shadow-sm ring-1 ring-[#D34E4E]/20' 
                               : ''
                           }`}
+                          ref={(el) => {
+                            ingredientRefs.current[`${idx}-${i}`] = el
+                          }}
                         >
                           <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors ${
                             isIngredientHighlighted(idx, i) ? 'bg-[#D34E4E]' : 'bg-[#D34E4E]'
