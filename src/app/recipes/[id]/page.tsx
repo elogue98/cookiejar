@@ -136,6 +136,11 @@ interface Recipe {
   } | null
 }
 
+type RecipeRow = Recipe & {
+  cookbooksource?: string | null
+  created_by?: string | null
+}
+
 interface PageProps {
   params: Promise<{ id: string }>
 }
@@ -147,18 +152,18 @@ export default async function RecipeDetail({ params }: PageProps) {
     .from('recipes')
     .select('*')
     .eq('id', id)
-    .single()
+    .single<RecipeRow>()
 
   if (error || !recipe) {
     notFound()
   }
 
   let creator: { id: string; name: string; avatar_url: string } | null = null
-  if ((recipe as any).created_by) {
+  if (recipe?.created_by) {
     const { data: creatorData, error: creatorError } = await supabase
       .from('users')
       .select('id, name, avatar_url')
-      .eq('id', (recipe as any).created_by)
+      .eq('id', recipe.created_by)
       .single()
     
     if (!creatorError && creatorData) {
@@ -305,8 +310,8 @@ export default async function RecipeDetail({ params }: PageProps) {
     ...recipe,
     ingredients: normalizedIngredients || [],
     instructions: normalizedInstructions || [],
-    cookbookSource: (recipe as any).cookbooksource || (recipe as any).cookbookSource || null,
-    created_by: (recipe as any).created_by || null,
+    cookbookSource: recipe.cookbooksource || recipe.cookbookSource || null,
+    created_by: recipe.created_by || null,
     creator: creator
   }
 

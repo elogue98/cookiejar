@@ -1,5 +1,24 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabaseClient'
+import type { Json } from '@/types/json'
+
+type VersionUser = {
+  id: string
+  name: string | null
+  avatar_url: string | null
+}
+
+type VersionRow = {
+  id: string
+  recipe_id: string
+  user_id: string
+  timestamp: string
+  field_changed: string
+  previous_value: Json | string | null
+  new_value: Json | string | null
+  description: string | null
+  users: VersionUser | null
+}
 
 /**
  * GET /api/recipes/[id]/versions
@@ -49,7 +68,8 @@ export async function GET(
     }
 
     // Transform the data to flatten user info and parse JSON values
-    const transformedVersions = (versions || []).map((version: any) => {
+    const versionRows: VersionRow[] = Array.isArray(versions) ? versions : []
+    const transformedVersions = versionRows.map((version) => {
       let previousValue = null
       let newValue = null
 

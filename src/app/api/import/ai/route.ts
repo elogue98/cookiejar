@@ -30,6 +30,88 @@ type WprmStructuredData = {
   instructionSections: StructuredInstructionSection[]
 }
 
+type JsonLdRecipe = {
+  '@type'?: string | string[]
+  image?: unknown
+  recipeIngredient?: unknown
+  recipeInstructions?: unknown
+  [key: string]: unknown
+}
+
+type JsonLdImage =
+  | string
+  | { url?: string | null }
+  | Array<string | { url?: string | null }>
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
+const matchesSchemaType = (value: unknown, target: string): boolean => {
+  if (typeof value === 'string') {
+    return (
+      value === target ||
+      value === `http://schema.org/${target}` ||
+      value === `https://schema.org/${target}`
+    )
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((entry) => matchesSchemaType(entry, target))
+  }
+
+  return false
+}
+
+const findRecipeNode = (data: unknown): JsonLdRecipe | null => {
+  if (Array.isArray(data)) {
+    for (const entry of data) {
+      const match = findRecipeNode(entry)
+      if (match) {
+        return match
+      }
+    }
+    return null
+  }
+
+  if (isObject(data)) {
+    const node = data as JsonLdRecipe
+    if (matchesSchemaType(node['@type'], 'Recipe')) {
+      return node
+    }
+  }
+
+  return null
+}
+
+const resolveImageUrl = (value: unknown, baseUrl: string): string | null => {
+  if (typeof value === 'string') {
+    try {
+      return new URL(value, baseUrl).href
+    } catch {
+      return null
+    }
+  }
+
+  if (isObject(value) && typeof value.url === 'string') {
+    try {
+      return new URL(value.url, baseUrl).href
+    } catch {
+      return null
+    }
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const resolved = resolveImageUrl(entry, baseUrl)
+      if (resolved) {
+        return resolved
+      }
+    }
+  }
+
+  return null
+}
+
 const FRACTION_CHARACTERS = '¼½¾⅓⅔⅛⅜⅝⅞'
 const QUANTITY_PATTERN = new RegExp(`[0-9${FRACTION_CHARACTERS}\\/]+`)
 
@@ -242,62 +324,28 @@ function extractImageFromHTML(html: string, baseUrl: string): string | null {
   
   // Try JSON-LD image first
   const scripts = $('script[type="application/ld+json"]')
-  let recipe: any = null
+  let recipe: JsonLdRecipe | null = null
   
   scripts.each((_, el) => {
     try {
       const jsonData = JSON.parse($(el).html() || '{}')
-      if (Array.isArray(jsonData)) {
-        recipe = jsonData.find((item: any) => {
-          const type = item['@type']
-          return type === 'Recipe' || 
-                 type === 'http://schema.org/Recipe' || 
-                 type === 'https://schema.org/Recipe' ||
-                 (Array.isArray(type) && type.includes('Recipe'))
-        })
-      } else if (jsonData['@type'] === 'Recipe' || 
-                 jsonData['@type'] === 'http://schema.org/Recipe' ||
-                 jsonData['@type'] === 'https://schema.org/Recipe') {
-        recipe = jsonData
+      const foundRecipe = findRecipeNode(jsonData)
+      if (foundRecipe) {
+        recipe = foundRecipe
+        return false
       }
-      if (recipe) return false // break
     } catch {
       // Ignore JSON parse errors
     }
+
+    return undefined
   })
   
   // Extract image from JSON-LD
   if (recipe?.image) {
-    if (typeof recipe.image === 'string') {
-      try {
-        return new URL(recipe.image, baseUrl).href
-      } catch {
-        return null
-      }
-    }
-    if (Array.isArray(recipe.image) && recipe.image.length > 0) {
-      const img = recipe.image[0]
-      if (typeof img === 'string') {
-        try {
-          return new URL(img, baseUrl).href
-        } catch {
-          return null
-        }
-      }
-      if (img.url) {
-        try {
-          return new URL(img.url, baseUrl).href
-        } catch {
-          return null
-        }
-      }
-    }
-    if (recipe.image.url) {
-      try {
-        return new URL(recipe.image.url, baseUrl).href
-      } catch {
-        return null
-      }
+    const resolved = resolveImageUrl(recipe.image, baseUrl)
+    if (resolved) {
+      return resolved
     }
   }
   
@@ -412,36 +460,22 @@ function extractTextFromHTML(html: string): string {
   
   // First, extract JSON-LD Recipe schema metadata if present
   const scripts = $('script[type="application/ld+json"]')
-  let recipeMetadata: any = null
+  let recipeMetadata: JsonLdRecipe | null = null
   
   scripts.each((_, el) => {
     try {
       const jsonData = JSON.parse($(el).html() || '{}')
-      let recipe: any = null
-      
-      if (Array.isArray(jsonData)) {
-        recipe = jsonData.find((item: any) => {
-          const type = item['@type']
-          return type === 'Recipe' || 
-                 type === 'http://schema.org/Recipe' || 
-                 type === 'https://schema.org/Recipe' ||
-                 (Array.isArray(type) && type.includes('Recipe'))
-        })
-      } else if (jsonData['@type'] === 'Recipe' || 
-                 jsonData['@type'] === 'http://schema.org/Recipe' ||
-                 jsonData['@type'] === 'https://schema.org/Recipe') {
-        recipe = jsonData
-      } else if (Array.isArray(jsonData['@type']) && jsonData['@type'].includes('Recipe')) {
-        recipe = jsonData
-      }
+      const recipe = findRecipeNode(jsonData)
       
       if (recipe) {
         recipeMetadata = recipe
-        return false // break
+        return false
       }
     } catch {
       // Ignore JSON parse errors
     }
+
+    return undefined
   })
   
   // Build metadata text from JSON-LD if found
@@ -945,7 +979,7 @@ ${content.substring(0, 8000)}`
   }
 
   // Parse JSON response
-  let parsed: any
+  let parsed: unknown
   try {
     parsed = JSON.parse(response)
   } catch (parseError) {

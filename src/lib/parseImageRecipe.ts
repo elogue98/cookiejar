@@ -106,7 +106,14 @@ function normalizeInstruction(instruction: string): string {
 /**
  * Post-process parsed recipe data
  */
-function postProcessRecipe(raw: any): ParsedRecipe {
+type RawRecipe = {
+  title?: unknown;
+  ingredients?: unknown;
+  instructions?: unknown;
+  tags?: unknown;
+};
+
+function postProcessRecipe(raw: RawRecipe): ParsedRecipe {
   // Extract and clean title
   const title = typeof raw.title === "string" ? raw.title.trim() : "";
 
@@ -114,11 +121,11 @@ function postProcessRecipe(raw: any): ParsedRecipe {
   let ingredients: string[] = [];
   if (Array.isArray(raw.ingredients)) {
     ingredients = raw.ingredients
-      .map((ing: any) => {
-        const str = typeof ing === "string" ? ing : String(ing || "");
+      .map((ing) => {
+        const str = typeof ing === "string" ? ing : String(ing ?? "");
         return normalizeIngredient(str);
       })
-      .filter((ing: string) => ing.length > 0);
+      .filter((ing) => ing.length > 0);
   }
   ingredients = deduplicateArray(ingredients);
 
@@ -126,11 +133,11 @@ function postProcessRecipe(raw: any): ParsedRecipe {
   let instructions: string[] = [];
   if (Array.isArray(raw.instructions)) {
     instructions = raw.instructions
-      .map((inst: any) => {
-        const str = typeof inst === "string" ? inst : String(inst || "");
+      .map((inst) => {
+        const str = typeof inst === "string" ? inst : String(inst ?? "");
         return normalizeInstruction(str);
       })
-      .filter((inst: string) => inst.length > 0);
+      .filter((inst) => inst.length > 0);
   }
   instructions = deduplicateArray(instructions);
 
@@ -138,11 +145,11 @@ function postProcessRecipe(raw: any): ParsedRecipe {
   let tags: string[] | undefined = undefined;
   if (Array.isArray(raw.tags)) {
     tags = raw.tags
-      .map((tag: any) => {
-        const str = typeof tag === "string" ? tag : String(tag || "");
+      .map((tag) => {
+        const str = typeof tag === "string" ? tag : String(tag ?? "");
         return str.toLowerCase().trim();
       })
-      .filter((tag: string) => tag.length > 0);
+      .filter((tag) => tag.length > 0);
     tags = Array.from(new Set(tags)); // Deduplicate
     if (tags.length === 0) {
       tags = undefined;
@@ -231,7 +238,7 @@ Return ONLY the JSON object, nothing else.`;
     }
 
     // Parse JSON response
-    let parsed: any;
+    let parsed: unknown;
     try {
       // Try direct JSON parse
       parsed = JSON.parse(content);
@@ -251,7 +258,7 @@ Return ONLY the JSON object, nothing else.`;
     }
 
     // Post-process and return
-    return postProcessRecipe(parsed);
+    return postProcessRecipe(parsed as RawRecipe);
   } catch (error) {
     console.error("Error parsing image recipe:", error);
     throw new Error(

@@ -1,16 +1,23 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabaseClient'
 import { saveRecipeVersion } from '@/lib/saveRecipeVersion'
+import type { Json } from '@/types/json'
+
+type IngredientGroup = { section: string; items: string[] }
+type InstructionGroup = { section: string; steps: string[] }
+
+type IngredientValue = IngredientGroup[] | string[] | string | null | undefined
+type InstructionValue = InstructionGroup[] | string | null | undefined
 
 /**
  * Generate a detailed description of ingredient changes
  */
 function generateIngredientChangeDescription(
-  previous: any,
-  updated: any
+  previous: IngredientValue,
+  updated: IngredientValue
 ): string {
   // Normalize both to structured format for comparison
-  const normalizeIngredients = (ing: any): { section: string; items: string[] }[] => {
+  const normalizeIngredients = (ing: IngredientValue): IngredientGroup[] => {
     if (!ing) return []
     if (Array.isArray(ing)) {
       if (ing.length === 0) return []
@@ -106,11 +113,11 @@ function generateIngredientChangeDescription(
  * Generate a detailed description of instruction changes
  */
 function generateInstructionChangeDescription(
-  previous: any,
-  updated: any
+  previous: InstructionValue,
+  updated: InstructionValue
 ): string {
   // Normalize both to structured format
-  const normalizeInstructions = (inst: any): { section: string; steps: string[] }[] => {
+  const normalizeInstructions = (inst: InstructionValue): InstructionGroup[] => {
     if (!inst) return []
     if (Array.isArray(inst)) {
       if (inst.length === 0) return []
@@ -205,7 +212,7 @@ export async function PUT(
     // Prepare update data
     const updateData: {
       title?: string
-      ingredients?: string[]
+      ingredients?: string[] | IngredientGroup[]
       instructions?: string | null
       tags?: string[]
       rating?: number | null
@@ -220,7 +227,7 @@ export async function PUT(
     }
 
     // Handle ingredients - support both structured format and legacy format
-    let normalizedIngredients: any = null
+    let normalizedIngredients: IngredientGroup[] | string[] | string | null = null
     if (ingredients !== undefined) {
       if (typeof ingredients === 'string') {
         normalizedIngredients = ingredients
@@ -246,7 +253,7 @@ export async function PUT(
     }
 
     // Handle instructions - support both structured format and legacy string format
-    let normalizedInstructions: any = null
+    let normalizedInstructions: InstructionGroup[] | string | null = null
     if (instructions !== undefined) {
       if (typeof instructions === 'string') {
         normalizedInstructions = instructions.trim() || null
@@ -338,8 +345,8 @@ export async function PUT(
       
       for (const field of fieldsToTrack) {
         if (field in updateData) {
-          let previousValue: any = null
-          let newValue: any = null
+          let previousValue: Json | IngredientValue | InstructionValue | string[] | null = null
+          let newValue: Json | IngredientValue | InstructionValue | string[] | null = null
           let description: string | undefined = undefined
 
           if (field === 'title') {

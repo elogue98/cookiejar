@@ -6,6 +6,18 @@ import {
   normalizeInstructionSections,
 } from '@/lib/recipeFormatting'
 
+type NormalizedIngredients = ReturnType<typeof normalizeIngredientSections>
+type NormalizedInstructions = ReturnType<typeof normalizeInstructionSections>
+
+type RecipeInsertPayload = {
+  title: string
+  ingredients: NormalizedIngredients
+  instructions: NormalizedInstructions
+  tags: string[]
+  cookbooksource: string | null
+  notes: string | null
+}
+
 /**
  * POST /api/import/image/finalize
  * 
@@ -88,7 +100,7 @@ export async function POST(req: Request) {
           ])
 
     // Prepare recipe data
-    const recipeData: any = {
+    const recipeData: RecipeInsertPayload = {
       title: title.trim(),
       ingredients: normalizedIngredients,
       instructions: normalizedInstructions,

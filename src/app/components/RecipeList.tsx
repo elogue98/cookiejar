@@ -188,12 +188,12 @@ export default function RecipeList({ recipes }: RecipeListProps) {
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4 justify-start md:justify-end w-full md:w-auto">
           {/* Toggle Filter (Only show if user is logged in) */}
           {user && (
             <div 
               onClick={() => setFilterMode(prev => prev === 'all' ? 'mine' : 'all')}
-              className="bg-white p-1 rounded-full border border-gray-200 flex items-center shadow-sm relative cursor-pointer hover:bg-gray-50 transition-colors select-none"
+              className="bg-white p-1 rounded-full border border-gray-200 flex items-center shadow-sm relative cursor-pointer hover:bg-gray-50 transition-colors select-none flex-shrink-0"
             >
               {/* Sliding Background Pill */}
               <div
@@ -229,7 +229,7 @@ export default function RecipeList({ recipes }: RecipeListProps) {
 
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="bg-[#D34E4E] text-white px-6 py-3 rounded-[20px] font-medium hover:opacity-90 transition-opacity shadow-lg shadow-[#D34E4E]/20 whitespace-nowrap"
+            className="bg-[#D34E4E] text-white px-6 py-3 rounded-[20px] font-medium hover:opacity-90 transition-opacity shadow-lg shadow-[#D34E4E]/20 whitespace-nowrap w-full sm:w-auto text-center flex-shrink-0"
           >
             + New Recipe
           </button>

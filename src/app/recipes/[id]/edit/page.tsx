@@ -20,6 +20,24 @@ interface Recipe {
   cookbookSource: string | null
 }
 
+type NutritionMetadata = {
+  calories?: number
+  protein?: number
+  fat?: number
+  carbs?: number
+}
+
+type RecipeMetadata = {
+  description?: string
+  servings?: number
+  prepTime?: string
+  cookTime?: string
+  totalTime?: string
+  cuisine?: string
+  mealType?: string
+  nutrition?: NutritionMetadata
+}
+
 export default function EditRecipePage() {
   const params = useParams()
   const router = useRouter()
@@ -172,7 +190,7 @@ export default function EditRecipePage() {
     let notesToSave: string | null = null
     if (hasMetadata) {
       // Build metadata object
-      const metadata: any = {}
+      const metadata: RecipeMetadata = {}
       if (description.trim()) metadata.description = description.trim()
       if (servings.trim()) metadata.servings = parseInt(servings, 10)
       if (prepTime.trim()) metadata.prepTime = prepTime.trim()
@@ -181,7 +199,7 @@ export default function EditRecipePage() {
       if (cuisine.trim()) metadata.cuisine = cuisine.trim()
       if (mealType.trim()) metadata.mealType = mealType.trim()
       
-      const nutrition: any = {}
+      const nutrition: NutritionMetadata = {}
       if (calories.trim()) nutrition.calories = parseInt(calories, 10)
       if (protein.trim()) nutrition.protein = parseFloat(protein)
       if (fat.trim()) nutrition.fat = parseFloat(fat)

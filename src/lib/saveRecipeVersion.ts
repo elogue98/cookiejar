@@ -1,11 +1,12 @@
 import { createServerClient } from './supabaseClient'
+import type { Json } from '@/types/json'
 
 interface SaveRecipeVersionParams {
   recipe_id: string
   user_id: string
   field_changed: string
-  previous_value: any
-  new_value: any
+  previous_value: Json | Record<string, unknown> | unknown[] | null
+  new_value: Json | Record<string, unknown> | unknown[] | null
   description?: string
 }
 

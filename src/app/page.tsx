@@ -74,8 +74,16 @@ export default async function Home() {
     console.error('Error fetching ratings:', error)
   }
 
+  const recipeList: Recipe[] = Array.isArray(recipes) ? recipes : []
+
   // Fetch all creators for recipes that have created_by
-  const creatorIds = [...new Set((recipes || []).map(r => (r as any).created_by).filter(Boolean))]
+  const creatorIds = [
+    ...new Set(
+      recipeList
+        .map((r) => r.created_by)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    ),
+  ]
   let creatorsMap: Record<string, { id: string; name: string; avatar_url: string }> = {}
   
   if (creatorIds.length > 0) {
@@ -96,9 +104,9 @@ export default async function Home() {
   }
 
   // Map recipes with average ratings and creator info
-  const recipesWithAverageRatings: Recipe[] = (recipes || []).map((recipe) => {
+  const recipesWithAverageRatings: Recipe[] = recipeList.map((recipe) => {
     const averageRating = averageRatingsMap[recipe.id] ?? recipe.rating
-    const createdBy = (recipe as any).created_by
+    const createdBy = recipe.created_by
     const creator = createdBy && creatorsMap[createdBy] ? creatorsMap[createdBy] : null
     
     return {

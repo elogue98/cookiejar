@@ -8,6 +8,14 @@ type CommentUser = {
   avatar_url: string | null
 }
 
+type CommentRow = {
+  id: string
+  message: string
+  created_at: string
+  user_id: string
+  users: CommentUser | CommentUser[] | null
+}
+
 function normalizeUserRelation(
   relation: CommentUser | CommentUser[] | null
 ): CommentUser | null {
@@ -59,7 +67,8 @@ export async function GET(
     }
 
     // Transform the data to flatten user info
-    const transformedComments = (comments || []).map((comment: any) => {
+    const commentRows: CommentRow[] = Array.isArray(comments) ? comments : []
+    const transformedComments = commentRows.map((comment) => {
       const normalizedUser = normalizeUserRelation(
         comment.users as CommentUser | CommentUser[] | null
       )

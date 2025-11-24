@@ -22,6 +22,54 @@ interface RecipeInteractionWrapperProps {
   }
 }
 
+const UNIT_WORDS = [
+  'g', 'kg', 'gram', 'grams', 'kilogram', 'kilograms',
+  'ml', 'l', 'liter', 'liters', 'milliliter', 'milliliters',
+  'oz', 'ounce', 'ounces', 'lb', 'lbs', 'pound', 'pounds',
+  'tsp', 'tbsp', 'teaspoon', 'teaspoons', 'tablespoon', 'tablespoons',
+  'cup', 'cups', 'pint', 'pints', 'quart', 'quarts', 'gallon', 'gallons',
+  'pinch', 'pinches', 'dash', 'dashes', 'handful', 'handfuls',
+  'clove', 'cloves', 'sprig', 'sprigs', 'stalk', 'stalks', 'stick', 'sticks',
+  'bunch', 'bunches', 'head', 'heads', 'bulb', 'bulbs', 'ear', 'ears',
+  'slice', 'slices', 'piece', 'pieces', 'can', 'cans', 'tin', 'tins',
+  'jar', 'jars', 'bottle', 'bottles', 'pack', 'packs', 'package', 'packages',
+  'box', 'boxes', 'bag', 'bags', 'container', 'containers'
+]
+
+const PREP_WORDS = [
+  'chopped', 'sliced', 'diced', 'minced', 'grated', 'peeled', 'crushed',
+  'finely', 'roughly', 'coarsely', 'thinly', 'thickly',
+  'fresh', 'dried', 'ground', 'whole', 'large', 'medium', 'small',
+  'extra', 'virgin', 'boneless', 'skinless', 'fat-free', 'low-fat',
+  'organic', 'unsalted', 'salted', 'cold', 'hot', 'warm', 'melted',
+  'room', 'temperature', 'softened', 'beaten', 'whisked', 'sifted',
+  'divided', 'separated', 'optional', 'garnish', 'taste', 'needed',
+  'removed', 'reserved', 'drained', 'rinsed', 'cleaned', 'trimmed',
+  'halved', 'quartered', 'cubed', 'chunks', 'strips', 'wedges',
+  'beards', 'scrubbed', 'washed', 'bruised', 'leaves', 'only', 'red', 'green',
+  'shell', 'shells', 'skin', 'skins', 'bone', 'bones', 'seed', 'seeds',
+  'stem', 'stems', 'root', 'roots', 'tail', 'tails', 'extract',
+  'granulated', 'caster', 'powdered', 'icing', 'superfine', 'white',
+  'active', 'dry', 'instant', 'quick', 'rise', 'plain', 'all-purpose', 'regular', 'fast', 'action',
+  'cut', 'cutting', 'cooled', 'cool', 'cooling', 'chilled', 'refrigerated',
+  'refrigerator', 'fridge', 'freezer', 'stored', 'leftover', 'leftovers',
+  'half', 'halves', 'third', 'thirds', 'quarter', 'quarters'
+]
+
+const STOP_WORDS = [
+  'and', 'or', 'the', 'a', 'an', 'of', 'in', 'with', 'for', 'to', 'from', 'into'
+]
+
+const UNIT_REGEX = new RegExp(`\\b(${UNIT_WORDS.join('|')})\\b`, 'gi')
+const PREP_REGEX = new RegExp(`\\b(${PREP_WORDS.join('|')})\\b`, 'gi')
+const STOP_WORD_REGEX = new RegExp(`\\b(${STOP_WORDS.join('|')})\\b`, 'gi')
+
+const HEAD_NOUN_IGNORE_WORDS = new Set([
+  ...PREP_WORDS,
+  ...STOP_WORDS,
+  'into', 'onto', 'over', 'under'
+])
+
 /**
  * Aggressively cleans an ingredient string to extract the core food item.
  * Removes quantities, units, prep methods, and common stop words.
@@ -37,49 +85,13 @@ function cleanIngredientText(text: string): string {
   cleaned = cleaned.replace(/(^|\s)\d+[\d\/\.]*\s*/g, ' ')
 
   // 3. Remove units and containers (singular and plural)
-  const units = [
-    'g', 'kg', 'gram', 'grams', 'kilogram', 'kilograms',
-    'ml', 'l', 'liter', 'liters', 'milliliter', 'milliliters',
-    'oz', 'ounce', 'ounces', 'lb', 'lbs', 'pound', 'pounds',
-    'tsp', 'tbsp', 'teaspoon', 'teaspoons', 'tablespoon', 'tablespoons',
-    'cup', 'cups', 'pint', 'pints', 'quart', 'quarts', 'gallon', 'gallons',
-    'pinch', 'pinches', 'dash', 'dashes', 'handful', 'handfuls',
-    'clove', 'cloves', 'sprig', 'sprigs', 'stalk', 'stalks', 'stick', 'sticks',
-    'bunch', 'bunches', 'head', 'heads', 'bulb', 'bulbs', 'ear', 'ears',
-    'slice', 'slices', 'piece', 'pieces', 'can', 'cans', 'tin', 'tins',
-    'jar', 'jars', 'bottle', 'bottles', 'pack', 'packs', 'package', 'packages',
-    'box', 'boxes', 'bag', 'bags', 'container', 'containers'
-  ]
-  // Create a regex that matches these words as whole words
-  const unitRegex = new RegExp(`\\b(${units.join('|')})\\b`, 'gi')
-  cleaned = cleaned.replace(unitRegex, ' ')
+  cleaned = cleaned.replace(UNIT_REGEX, ' ')
 
   // 4. Remove preparation methods and descriptors
-  const prepWords = [
-    'chopped', 'sliced', 'diced', 'minced', 'grated', 'peeled', 'crushed',
-    'finely', 'roughly', 'coarsely', 'thinly', 'thickly',
-    'fresh', 'dried', 'ground', 'whole', 'large', 'medium', 'small',
-    'extra', 'virgin', 'boneless', 'skinless', 'fat-free', 'low-fat',
-    'organic', 'unsalted', 'salted', 'cold', 'hot', 'warm', 'melted',
-    'room', 'temperature', 'softened', 'beaten', 'whisked', 'sifted',
-    'divided', 'separated', 'optional', 'garnish', 'taste', 'needed',
-    'removed', 'reserved', 'drained', 'rinsed', 'cleaned', 'trimmed',
-    'halved', 'quartered', 'cubed', 'chunks', 'strips', 'wedges',
-    'beards', 'scrubbed', 'washed', 'bruised', 'leaves', 'only', 'red', 'green',
-    'shell', 'shells', 'skin', 'skins', 'bone', 'bones', 'seed', 'seeds',
-    'stem', 'stems', 'root', 'roots', 'tail', 'tails', 'extract',
-    'granulated', 'caster', 'powdered', 'icing', 'superfine', 'white',
-    'active', 'dry', 'instant', 'quick', 'rise', 'plain', 'all-purpose', 'regular', 'fast', 'action'
-  ]
-  const prepRegex = new RegExp(`\\b(${prepWords.join('|')})\\b`, 'gi')
-  cleaned = cleaned.replace(prepRegex, ' ')
+  cleaned = cleaned.replace(PREP_REGEX, ' ')
 
   // 5. Remove common stop words
-  const stopWords = [
-    'and', 'or', 'the', 'a', 'an', 'of', 'in', 'with', 'for', 'to', 'from', 'into'
-  ]
-  const stopWordRegex = new RegExp(`\\b(${stopWords.join('|')})\\b`, 'gi')
-  cleaned = cleaned.replace(stopWordRegex, ' ')
+  cleaned = cleaned.replace(STOP_WORD_REGEX, ' ')
 
   // 6. Remove punctuation and extra whitespace
   cleaned = cleaned.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim()
@@ -98,6 +110,52 @@ function singularize(word: string): string {
   return word
 }
 
+function getHeadNoun(tokens: string[]): string | null {
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const candidate = tokens[i]
+    if (!candidate) continue
+    if (candidate.length <= 1) continue
+    if (HEAD_NOUN_IGNORE_WORDS.has(candidate)) continue
+    return candidate
+  }
+
+  return tokens.length > 0 ? tokens[tokens.length - 1] : null
+}
+
+const stripTrailing = (value: string) => value.replace(/[:.]\s*$/, '').trim().toLowerCase()
+
+function normalizeIngredientGroups(groups: IngredientGroup[]): IngredientGroup[] {
+  return groups.map((group) => {
+    const section = group.section?.trim() || ''
+    const normalizedSection = stripTrailing(section)
+    const cleanedItems = (group.items || [])
+      .map((item) => (item || '').trim())
+      .filter((item) => item.length > 0)
+      .filter((item) => {
+        if (!normalizedSection) return true
+        return stripTrailing(item) !== normalizedSection
+      })
+
+    return { section, items: cleanedItems }
+  })
+}
+
+function normalizeInstructionGroups(groups: InstructionGroup[]): InstructionGroup[] {
+  return groups.map((group) => {
+    const section = group.section?.trim() || ''
+    const normalizedSection = stripTrailing(section)
+    const cleanedSteps = (group.steps || [])
+      .map((step) => (step || '').trim())
+      .filter((step) => step.length > 0)
+      .filter((step) => {
+        if (!normalizedSection) return true
+        return stripTrailing(step) !== normalizedSection
+      })
+
+    return { section, steps: cleanedSteps }
+  })
+}
+
 function mapIngredientsToSteps(ingredients: IngredientGroup[], instructions: InstructionGroup[]): Record<string, string[]> {
   const mapping: Record<string, string[]> = {}
   
@@ -105,7 +163,8 @@ function mapIngredientsToSteps(ingredients: IngredientGroup[], instructions: Ins
   const processedIngredients: { 
     original: string
     id: string
-    tokens: string[] 
+    tokens: string[]
+    headNoun: string | null
   }[] = []
 
   ingredients.forEach((group, groupIdx) => {
@@ -118,10 +177,12 @@ function mapIngredientsToSteps(ingredients: IngredientGroup[], instructions: Ins
         .map(singularize)
       
       if (tokens.length > 0) {
+        const headNoun = getHeadNoun(tokens)
         processedIngredients.push({
           original: item,
           id: `${groupIdx}-${itemIdx}`,
-          tokens
+          tokens,
+          headNoun
         })
       }
     })
@@ -174,7 +235,7 @@ function mapIngredientsToSteps(ingredients: IngredientGroup[], instructions: Ins
         }
         if (isSectionMismatch) return 
 
-        ingGroup.items.forEach((item, itemIdx) => {
+            ingGroup.items.forEach((item, itemIdx) => {
             const fullId = `${groupIdx}-${itemIdx}`
             const ing = processedIngredients.find(p => p.id === fullId)
             if (!ing) return
@@ -203,9 +264,8 @@ function mapIngredientsToSteps(ingredients: IngredientGroup[], instructions: Ins
             // 2. If partial match (>= 50%) - Relaxed from 66% to allow 2-word items (1/2) to match via Head Noun
             else if (matchPercentage >= 0.5) {
               // HEAD NOUN HEURISTIC:
-              // We assume the LAST token in the ingredient is the "Head Noun"
-              const headNoun = ing.tokens[ing.tokens.length - 1]
-              if (matchedTokens.has(headNoun)) {
+              const headNoun = ing.headNoun
+              if (headNoun && (matchedTokens.has(headNoun) || cleanStepText.includes(headNoun))) {
                  isMatch = true
               } else {
                  // Fallback: check if the *full phrase* exists in the step text 
@@ -243,7 +303,6 @@ function mapIngredientsToSteps(ingredients: IngredientGroup[], instructions: Ins
       
       // Helper to get candidate tokens from processed list
       const getTokens = (id: string) => {
-          const parts = id.split('-')
           const p = processedIngredients.find(i => i.id === id)
           return p ? new Set(p.tokens) : new Set<string>()
       }
@@ -316,9 +375,13 @@ export default function RecipeInteractionWrapper({ ingredients, instructions, ch
   const [activeStepId, setActiveStepId] = useState<string | null>(null)
   
   // Memoize the mapping so it's only calculated once on load
+  const normalizedIngredients = useMemo(() => normalizeIngredientGroups(ingredients), [ingredients])
+
+  const normalizedInstructions = useMemo(() => normalizeInstructionGroups(instructions), [instructions])
+
   const ingredientMapping = useMemo(() => {
-    return mapIngredientsToSteps(ingredients, instructions)
-  }, [ingredients, instructions])
+    return mapIngredientsToSteps(normalizedIngredients, normalizedInstructions)
+  }, [normalizedIngredients, normalizedInstructions])
 
   // Helper to check if an ingredient is highlighted
   const isIngredientHighlighted = (groupIdx: number, itemIdx: number) => {
@@ -338,9 +401,9 @@ export default function RecipeInteractionWrapper({ ingredients, instructions, ch
          {/* Ingredients List */}
          <div>
             <h3 className="font-serif text-xl font-medium mb-4 pb-2 border-b border-slate-200">Ingredients</h3>
-            {ingredients.length > 0 ? (
+            {normalizedIngredients.length > 0 ? (
               <div className="space-y-6 text-sm">
-                {ingredients.map((group, idx) => (
+                {normalizedIngredients.map((group, idx) => (
                   <div key={idx}>
                     {group.section && <h4 className="font-bold mb-2 text-slate-700 uppercase text-xs tracking-wider">{group.section}</h4>}
                     <ul className="space-y-2">
@@ -375,9 +438,9 @@ export default function RecipeInteractionWrapper({ ingredients, instructions, ch
 
          {/* Instructions */}
          <section className="mb-16">
-            {instructions.length > 0 ? (
+            {normalizedInstructions.length > 0 ? (
               <div className="space-y-10">
-                 {instructions.map((group, idx) => (
+                 {normalizedInstructions.map((group, idx) => (
                    <div key={idx}>
                      {group.section && <h3 className="text-xl font-bold mb-6 text-slate-800">{group.section}</h3>}
                      <ol className="space-y-8">
@@ -422,3 +485,5 @@ export default function RecipeInteractionWrapper({ ingredients, instructions, ch
     </div>
   )
 }
+
+export { mapIngredientsToSteps }

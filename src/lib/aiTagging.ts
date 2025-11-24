@@ -100,6 +100,9 @@ function generateFreeTags(input: TagInput): string[] {
  * @returns Array of lowercase tags (3-8 tags)
  * @throws Never throws - returns fallback tags or empty array on error
  */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
 export async function generateTagsForRecipe(input: TagInput): Promise<string[]> {
   // Validate input
   if (!input.title || input.title.trim().length === 0) {
@@ -171,7 +174,7 @@ Return a JSON object with a "tags" property containing an array of tags. Example
     }
 
     // Parse JSON response
-    let parsed: any
+    let parsed: unknown
     try {
       parsed = JSON.parse(content)
     } catch (parseError) {
@@ -192,15 +195,15 @@ Return a JSON object with a "tags" property containing an array of tags. Example
 
     // Extract tags from response
     // OpenAI might return { tags: [...] } or just [...]
-    let tags: string[] = []
+    let tags: unknown[] = []
     if (Array.isArray(parsed)) {
       tags = parsed
-    } else if (parsed.tags && Array.isArray(parsed.tags)) {
+    } else if (isRecord(parsed) && Array.isArray(parsed.tags)) {
       tags = parsed.tags
-    } else if (typeof parsed === 'object') {
-      // Try to find any array value
-      const values = Object.values(parsed)
-      const arrayValue = values.find((v) => Array.isArray(v)) as string[] | undefined
+    } else if (isRecord(parsed)) {
+      const arrayValue = Object.values(parsed).find((value): value is unknown[] =>
+        Array.isArray(value)
+      )
       if (arrayValue) {
         tags = arrayValue
       }
@@ -246,16 +249,25 @@ Return a JSON object with a "tags" property containing an array of tags. Example
     }
 
     return cleanedTags
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Handle specific error types
-    if (error?.status === 429 || error?.code === 'insufficient_quota') {
+    if (
+      isRecord(error) &&
+      (error.status === 429 || error.code === 'insufficient_quota')
+    ) {
       // Quota exceeded - silently fall back to free tagging
       console.warn('OpenAI quota exceeded, using free keyword-based tagging')
       return generateFreeTags(input)
     }
     
     // Other errors - log but don't throw - fall back to free keyword-based tagging
-    console.error('Error generating AI tags, falling back to keyword-based tagging:', error?.message || error)
+    const message =
+      error instanceof Error
+        ? error.message
+        : isRecord(error) && typeof error.message === 'string'
+          ? error.message
+          : String(error)
+    console.error('Error generating AI tags, falling back to keyword-based tagging:', message)
     return generateFreeTags(input)
   }
 }

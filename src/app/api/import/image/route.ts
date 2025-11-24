@@ -202,7 +202,7 @@ ${content.substring(0, 8000)}`
   }
 
   // Parse JSON response
-  let parsed: any
+  let parsed: unknown
   try {
     parsed = JSON.parse(response)
   } catch (parseError) {
