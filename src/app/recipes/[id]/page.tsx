@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient'
+import { appendMetricMeasurement } from '@/lib/ingredientUnits'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import DeleteRecipeButton from '@/app/components/DeleteRecipeButton'
@@ -42,10 +43,16 @@ function getDomain(url: string): string {
 }
 
 function cleanIngredient(raw: string): string {
-  return raw
+  const stripped = raw
     .replace(/^\s*[-•*]\s*/, '')
     .replace(/\s+/g, ' ')
     .trim()
+
+  if (!stripped) {
+    return stripped
+  }
+
+  return appendMetricMeasurement(stripped)
 }
 
 function cleanInstruction(raw: string): string {

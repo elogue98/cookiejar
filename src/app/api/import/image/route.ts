@@ -253,7 +253,7 @@ ${content.substring(0, 8000)}`
 }
 
 function flattenIngredientPreview(
-  sections: ReturnType<typeof normalizeIngredientSections>
+  sections: Awaited<ReturnType<typeof normalizeIngredientSections>>
 ): string[] {
   const result: string[] = []
 
@@ -362,7 +362,9 @@ export async function POST(req: Request) {
     }
 
     // Step 3: Normalize sections for preview + later storage
-    const ingredientSections = normalizeIngredientSections(extractedRecipe.ingredientSections)
+    const ingredientSections = await normalizeIngredientSections(
+      extractedRecipe.ingredientSections
+    )
     const instructionSections = normalizeInstructionSections(extractedRecipe.instructionSections)
     const ingredients = flattenIngredientPreview(ingredientSections)
     const instructions = formatInstructionPreview(instructionSections)

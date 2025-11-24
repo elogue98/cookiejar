@@ -1277,7 +1277,9 @@ export async function POST(req: Request) {
     const finalSourceUrl = extractedRecipe.sourceUrl || sourceUrl
     
     // Prepare recipe data for Supabase (store structured sections to keep headers)
-    const ingredients = normalizeIngredientSections(extractedRecipe.ingredientSections)
+    const ingredients = await normalizeIngredientSections(
+      extractedRecipe.ingredientSections
+    )
     const instructions = normalizeInstructionSections(extractedRecipe.instructionSections)
     const metadataNotes = formatMetadataForNotes(extractedRecipe)
 

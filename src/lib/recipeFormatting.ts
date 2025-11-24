@@ -1,3 +1,9 @@
+import {
+  MetricConversion,
+  appendMetricMeasurement,
+  appendMetricMeasurementWithAI,
+} from './ingredientUnits'
+
 export type IngredientSectionInput = {
   section?: string | null
   items: string[]
@@ -49,30 +55,57 @@ function isGenericHeader(text: string, genericList: string[]): boolean {
   return genericList.includes(normalized)
 }
 
-export function normalizeIngredientSections(
-  sections: IngredientSectionInput[]
+type IngredientNormalizationOptions = {
+  enableAiConversions?: boolean
+}
+
+export async function normalizeIngredientSections(
+  sections: IngredientSectionInput[],
+  options?: IngredientNormalizationOptions
 ) {
-  return sections
-    .map((section) => {
-      const sectionText = section.section?.trim() || ''
-      const items = section.items
-        .map((item) => item.trim())
-        .filter(Boolean)
-        // Remove items that are just the section header repeated
-        .filter((item) => {
-          const itemNormalized = item.toLowerCase().trim().replace(/[:\s]+$/, '')
-          return itemNormalized !== sectionText.toLowerCase().trim().replace(/[:\s]+$/, '')
-        })
-      
-      // If section is generic and it's the only section, remove the section header
-      const shouldRemoveGeneric = sections.length === 1 && isGenericHeader(sectionText, GENERIC_INGREDIENT_HEADERS)
-      
-      return {
-        section: shouldRemoveGeneric ? '' : sectionText,
-        items,
+  const enableAi = options?.enableAiConversions ?? true
+  const aiCache: Map<string, MetricConversion> | undefined = enableAi
+    ? new Map()
+    : undefined
+
+  const results = []
+
+  for (const section of sections) {
+    const sectionText = section.section?.trim() || ''
+    const processedItems: string[] = []
+
+    for (const rawItem of section.items) {
+      const trimmedItem = rawItem.trim()
+      if (!trimmedItem) {
+        continue
       }
+
+      const itemNormalized = trimmedItem.toLowerCase().trim().replace(/[:\s]+$/, '')
+      if (itemNormalized === sectionText.toLowerCase().trim().replace(/[:\s]+$/, '')) {
+        continue
+      }
+
+      const converted = enableAi
+        ? await appendMetricMeasurementWithAI(trimmedItem, { cache: aiCache })
+        : appendMetricMeasurement(trimmedItem)
+
+      processedItems.push(converted)
+    }
+
+    if (processedItems.length === 0) {
+      continue
+    }
+
+    const shouldRemoveGeneric =
+      sections.length === 1 && isGenericHeader(sectionText, GENERIC_INGREDIENT_HEADERS)
+
+    results.push({
+      section: shouldRemoveGeneric ? '' : sectionText,
+      items: processedItems,
     })
-    .filter((section) => section.items.length > 0)
+  }
+
+  return results
 }
 
 export function normalizeInstructionSections(

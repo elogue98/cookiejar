@@ -84,10 +84,10 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         return
       }
 
-      // Success - redirect to recipe with completion overlay
+      // Success - redirect to recipe page (no overlay for URL imports)
       setLoading(false)
       onClose()
-      router.push(`/recipes/${data.data.id}?import=review`)
+      router.push(`/recipes/${data.data.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
       setLoading(false)
@@ -123,10 +123,10 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         return
       }
 
-      // Success - redirect to recipe with completion overlay
+      // Success - redirect to recipe page (no overlay for text imports)
       setLoading(false)
       onClose()
-      router.push(`/recipes/${data.data.id}?import=review`)
+      router.push(`/recipes/${data.data.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
       setLoading(false)

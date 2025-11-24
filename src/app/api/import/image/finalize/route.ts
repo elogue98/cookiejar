@@ -6,7 +6,7 @@ import {
   normalizeInstructionSections,
 } from '@/lib/recipeFormatting'
 
-type NormalizedIngredients = ReturnType<typeof normalizeIngredientSections>
+type NormalizedIngredients = Awaited<ReturnType<typeof normalizeIngredientSections>>
 type NormalizedInstructions = ReturnType<typeof normalizeInstructionSections>
 
 type RecipeInsertPayload = {
@@ -103,8 +103,8 @@ export async function POST(req: Request) {
     // Normalize ingredients/instructions before storing
     const normalizedIngredients =
       Array.isArray(ingredientSections) && ingredientSections.length > 0
-        ? normalizeIngredientSections(ingredientSections)
-        : normalizeIngredientSections([
+        ? await normalizeIngredientSections(ingredientSections)
+        : await normalizeIngredientSections([
             {
               section: '',
               items: Array.isArray(ingredients) ? ingredients : [],
