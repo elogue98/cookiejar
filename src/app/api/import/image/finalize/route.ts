@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabaseClient'
 import { uploadOptimizedImage } from '@/lib/imageOptimization'
+import {
+  normalizeIngredientSections,
+  normalizeInstructionSections,
+} from '@/lib/recipeFormatting'
 
 /**
  * POST /api/import/image/finalize
@@ -23,7 +27,19 @@ import { uploadOptimizedImage } from '@/lib/imageOptimization'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { title, ingredients, instructions, tags, cookbookSource, metadataNotes, imageBuffer, imageMimeType, userId } = body
+    const {
+      title,
+      ingredients,
+      instructions,
+      tags,
+      cookbookSource,
+      metadataNotes,
+      imageBuffer,
+      imageMimeType,
+      userId,
+      ingredientSections,
+      instructionSections,
+    } = body
 
     // Validate required fields
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
@@ -40,11 +56,42 @@ export async function POST(req: Request) {
       )
     }
 
+    // Normalize ingredients/instructions before storing
+    const normalizedIngredients =
+      Array.isArray(ingredientSections) && ingredientSections.length > 0
+        ? normalizeIngredientSections(ingredientSections)
+        : normalizeIngredientSections([
+            {
+              section: '',
+              items: Array.isArray(ingredients) ? ingredients : [],
+            },
+          ])
+
+    const fallbackInstructionSteps =
+      typeof instructions === 'string'
+        ? instructions
+            .split('\n')
+            .map((line: string) => line.trim())
+            .filter(Boolean)
+        : Array.isArray(instructions)
+        ? instructions
+        : []
+
+    const normalizedInstructions =
+      Array.isArray(instructionSections) && instructionSections.length > 0
+        ? normalizeInstructionSections(instructionSections)
+        : normalizeInstructionSections([
+            {
+              section: '',
+              steps: fallbackInstructionSteps,
+            },
+          ])
+
     // Prepare recipe data
     const recipeData: any = {
       title: title.trim(),
-      ingredients: Array.isArray(ingredients) ? ingredients : [],
-      instructions: instructions || null,
+      ingredients: normalizedIngredients,
+      instructions: normalizedInstructions,
       tags: Array.isArray(tags) ? tags : [],
       cookbooksource: cookbookSource && cookbookSource.trim() ? cookbookSource.trim() : null,
       notes: metadataNotes && typeof metadataNotes === 'string' && metadataNotes.trim() ? metadataNotes.trim() : null,

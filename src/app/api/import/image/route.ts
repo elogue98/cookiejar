@@ -5,6 +5,11 @@ import { uploadOptimizedImage } from '@/lib/imageOptimization'
 import OpenAI from 'openai'
 import { aiComplete } from '@/lib/ai'
 import { z } from 'zod'
+import {
+  normalizeIngredientSections,
+  normalizeInstructionSections,
+  formatMetadataForNotes,
+} from '@/lib/recipeFormatting'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -223,15 +228,12 @@ ${content.substring(0, 8000)}`
   return validated
 }
 
-/**
- * Convert structured ingredients to flat array format for Supabase
- */
-function formatIngredientsForSupabase(
-  ingredientSections: RecipeExtraction['ingredientSections']
+function flattenIngredientPreview(
+  sections: ReturnType<typeof normalizeIngredientSections>
 ): string[] {
   const result: string[] = []
-  
-  for (const section of ingredientSections) {
+
+  for (const section of sections) {
     if (section.section) {
       result.push(`${section.section.toUpperCase()}:`)
     }
@@ -239,19 +241,16 @@ function formatIngredientsForSupabase(
       result.push(section.section ? `- ${item}` : item)
     }
   }
-  
+
   return result
 }
 
-/**
- * Convert structured instructions to string format for Supabase
- */
-function formatInstructionsForSupabase(
-  instructionSections: RecipeExtraction['instructionSections']
+function formatInstructionPreview(
+  sections: ReturnType<typeof normalizeInstructionSections>
 ): string {
   const parts: string[] = []
-  
-  for (const section of instructionSections) {
+
+  for (const section of sections) {
     if (section.section) {
       parts.push(`${section.section.toUpperCase()}:`)
     }
@@ -259,26 +258,8 @@ function formatInstructionsForSupabase(
       parts.push(step)
     }
   }
-  
-  return parts.join('\n\n')
-}
 
-/**
- * Format additional metadata as JSON string for notes field
- */
-function formatMetadataForNotes(recipe: RecipeExtraction): string {
-  const metadata: any = {}
-  
-  if (recipe.description) metadata.description = recipe.description
-  if (recipe.servings) metadata.servings = recipe.servings
-  if (recipe.prepTime) metadata.prepTime = recipe.prepTime
-  if (recipe.cookTime) metadata.cookTime = recipe.cookTime
-  if (recipe.totalTime) metadata.totalTime = recipe.totalTime
-  if (recipe.cuisine) metadata.cuisine = recipe.cuisine
-  if (recipe.mealType) metadata.mealType = recipe.mealType
-  if (recipe.nutrition) metadata.nutrition = recipe.nutrition
-  
-  return Object.keys(metadata).length > 0 ? JSON.stringify(metadata, null, 2) : ''
+  return parts.join('\n\n')
 }
 
 /**
@@ -349,9 +330,11 @@ export async function POST(req: Request) {
       )
     }
 
-    // Step 3: Format data for response
-    const ingredients = formatIngredientsForSupabase(extractedRecipe.ingredientSections)
-    const instructions = formatInstructionsForSupabase(extractedRecipe.instructionSections)
+    // Step 3: Normalize sections for preview + later storage
+    const ingredientSections = normalizeIngredientSections(extractedRecipe.ingredientSections)
+    const instructionSections = normalizeInstructionSections(extractedRecipe.instructionSections)
+    const ingredients = flattenIngredientPreview(ingredientSections)
+    const instructions = formatInstructionPreview(instructionSections)
     const metadataNotes = formatMetadataForNotes(extractedRecipe)
     const tags = extractedRecipe.tags || []
 
@@ -372,6 +355,8 @@ export async function POST(req: Request) {
           imageDataUrl: imageDataUrl,
           imageBuffer: base64Image,
           imageMimeType: file.type,
+          ingredientSections,
+          instructionSections,
         }
       },
       { status: 200 }

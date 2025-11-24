@@ -240,27 +240,63 @@ export default async function RecipeDetail({ params }: PageProps) {
   let normalizedInstructions: { section: string; steps: string[] }[] | null = null
   if (recipe.instructions) {
     if (Array.isArray(recipe.instructions)) {
-      if (recipe.instructions.length > 0 && typeof recipe.instructions[0] === 'object' && recipe.instructions[0] !== null && 'section' in recipe.instructions[0]) {
-        normalizedInstructions = (recipe.instructions as { section: string; steps: string[] }[]).map(group => {
+      if (
+        recipe.instructions.length > 0 &&
+        typeof recipe.instructions[0] === 'object' &&
+        recipe.instructions[0] !== null &&
+        'section' in recipe.instructions[0]
+      ) {
+        normalizedInstructions = (recipe.instructions as { section: string; steps: string[] }[]).map((group) => {
           const cleanedSection = cleanSectionHeader(group.section || '')
           const cleanedSteps = (group.steps || [])
             .map(cleanInstruction)
-            .filter(step => step.length > 0 && !isSectionHeader(step))
-          
+            .filter((step) => step.length > 0 && !isSectionHeader(step))
+
           return {
             section: cleanedSection,
-            steps: cleanedSteps
+            steps: cleanedSteps,
           }
-        }).filter(group => group.steps.length > 0 || group.section.trim().length > 0)
+        }).filter((group) => group.steps.length > 0 || group.section.trim().length > 0)
       }
     } else if (typeof recipe.instructions === 'string') {
-      const steps = recipe.instructions
-        .split('\n')
-        .map((step: string) => step.trim())
-        .filter((step: string) => step.length > 0)
-      if (steps.length > 0) {
-        const organized = organizeIntoGroups(steps, true)
-        normalizedInstructions = organized.map(g => ({ section: g.section, steps: g.items }))
+      const trimmed = recipe.instructions.trim()
+      let parsedStructured: unknown = null
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          parsedStructured = JSON.parse(trimmed)
+        } catch {
+          parsedStructured = null
+        }
+      }
+
+      if (
+        Array.isArray(parsedStructured) &&
+        parsedStructured.length > 0 &&
+        typeof parsedStructured[0] === 'object' &&
+        parsedStructured[0] !== null
+      ) {
+        normalizedInstructions = (parsedStructured as { section?: string; steps?: string[] }[])
+          .map((group) => {
+            const cleanedSection = cleanSectionHeader(group.section || '')
+            const cleanedSteps = (group.steps || [])
+              .map((step) => cleanInstruction(step || ''))
+              .filter((step) => step.length > 0 && !isSectionHeader(step))
+
+            return {
+              section: cleanedSection,
+              steps: cleanedSteps,
+            }
+          })
+          .filter((group) => group.steps.length > 0 || group.section.trim().length > 0)
+      } else {
+        const steps = trimmed
+          .split('\n')
+          .map((step: string) => step.trim())
+          .filter((step: string) => step.length > 0)
+        if (steps.length > 0) {
+          const organized = organizeIntoGroups(steps, true)
+          normalizedInstructions = organized.map((g) => ({ section: g.section, steps: g.items }))
+        }
       }
     }
   }
@@ -358,7 +394,7 @@ export default async function RecipeDetail({ params }: PageProps) {
                        <div className="text-sm">
                           <div className="font-medium">{recipeData.creator?.name || 'Unknown Chef'}</div>
                           <div className="text-slate-400 text-xs">
-                             {recipeData.created_at && new Date(recipeData.created_at).toLocaleDateString()}
+                             {recipeData.created_at && new Date(recipeData.created_at).toLocaleDateString('en-GB')}
                           </div>
                        </div>
                     </div>

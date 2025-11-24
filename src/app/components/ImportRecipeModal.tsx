@@ -21,6 +21,8 @@ interface ExtractedRecipeData {
   imageDataUrl: string
   imageBuffer: string
   imageMimeType: string
+  ingredientSections: { section: string; items: string[] }[]
+  instructionSections: { section: string; steps: string[] }[]
 }
 
 export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModalProps) {
@@ -180,6 +182,8 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
           metadataNotes: extractedData.metadataNotes || null,
           imageBuffer: extractedData.imageBuffer,
           imageMimeType: extractedData.imageMimeType,
+          ingredientSections: extractedData.ingredientSections,
+          instructionSections: extractedData.instructionSections,
           userId: user?.id,
         }),
       })

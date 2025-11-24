@@ -3,12 +3,203 @@ import { z } from 'zod'
 import { createServerClient } from '@/lib/supabaseClient'
 import { uploadOptimizedImage } from '@/lib/imageOptimization'
 import { aiComplete } from '@/lib/ai'
+import {
+  normalizeIngredientSections,
+  normalizeInstructionSections,
+  formatMetadataForNotes,
+} from '@/lib/recipeFormatting'
 import OpenAI from 'openai'
 import * as cheerio from 'cheerio'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 })
+
+type StructuredListSection = {
+  section?: string | null
+  items: string[]
+}
+
+type StructuredInstructionSection = {
+  section?: string | null
+  steps: string[]
+}
+
+type WprmStructuredData = {
+  ingredientSections: StructuredListSection[]
+  instructionSections: StructuredInstructionSection[]
+}
+
+const FRACTION_CHARACTERS = '¼½¾⅓⅔⅛⅜⅝⅞'
+const QUANTITY_PATTERN = new RegExp(`[0-9${FRACTION_CHARACTERS}\\/]+`)
+
+function normalizeText(value?: string | null): string {
+  if (!value) return ''
+  return value.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function formatNotes(notes: string): string {
+  if (!notes) return ''
+  const trimmed = notes.trim()
+  if (!trimmed) return ''
+  return /^\(.*\)$/.test(trimmed) ? trimmed : `(${trimmed})`
+}
+
+function extractWprmStructuredData(html: string): WprmStructuredData | null {
+  const $ = cheerio.load(html)
+
+  const ingredientSections: StructuredListSection[] = []
+  const instructionSections: StructuredInstructionSection[] = []
+
+  const startIngredientSection = (name?: string | null) => {
+    const normalizedName = normalizeText(name)
+    const section: StructuredListSection = {
+      section: normalizedName || undefined,
+      items: [],
+    }
+    ingredientSections.push(section)
+    return section
+  }
+
+  const ingredientContainers = $('.wprm-recipe-ingredients-container')
+  if (ingredientContainers.length > 0) {
+    ingredientContainers.each((_, container) => {
+      $(container)
+        .find('.wprm-recipe-ingredient-group')
+        .each((__, group) => {
+          let currentSection: StructuredListSection | null = null
+
+          const ensureSection = () => {
+            if (!currentSection) {
+              currentSection = startIngredientSection()
+            }
+            return currentSection
+          }
+
+          const explicitGroupName = normalizeText(
+            $(group)
+              .find('.wprm-recipe-group-name, .wprm-recipe-ingredient-group-name')
+              .first()
+              .text()
+          )
+          if (explicitGroupName) {
+            currentSection = startIngredientSection(explicitGroupName)
+          }
+
+          $(group)
+            .find('.wprm-recipe-ingredient')
+            .each((___, ingredient) => {
+              const $ingredient = $(ingredient)
+              const amount = normalizeText(
+                $ingredient.find('.wprm-recipe-ingredient-amount').text()
+              )
+              const unit = normalizeText(
+                $ingredient.find('.wprm-recipe-ingredient-unit').text()
+              )
+              const name = normalizeText(
+                $ingredient.find('.wprm-recipe-ingredient-name').text()
+              )
+              const notes = normalizeText(
+                $ingredient.find('.wprm-recipe-ingredient-notes').text()
+              )
+
+              const hasStrongOnly =
+                !amount &&
+                !unit &&
+                !notes &&
+                !!name &&
+                $ingredient
+                  .find('.wprm-recipe-ingredient-name strong, .wprm-recipe-ingredient-name b')
+                  .length > 0
+
+              if (hasStrongOnly) {
+                currentSection = startIngredientSection(name)
+                return
+              }
+
+              if (!amount && !unit && !name && !notes) {
+                return
+              }
+
+              const targetSection = ensureSection()
+              const parts = [amount, unit, name].filter(Boolean)
+              let ingredientLine = parts.join(' ').replace(/\s+,/g, ',').trim()
+              if (!ingredientLine) {
+                ingredientLine = notes || ''
+              }
+
+              const formattedNotes = formatNotes(notes)
+              if (formattedNotes) {
+                ingredientLine = `${ingredientLine} ${formattedNotes}`.trim()
+              }
+
+              if (ingredientLine) {
+                targetSection.items.push(ingredientLine)
+              }
+            })
+        })
+    })
+  }
+
+  const instructionContainers = $('.wprm-recipe-instructions-container')
+  if (instructionContainers.length > 0) {
+    instructionContainers.each((_, container) => {
+      $(container)
+        .find('.wprm-recipe-instruction-group')
+        .each((__, group) => {
+          const sectionName = normalizeText(
+            $(group)
+              .find('.wprm-recipe-group-name, .wprm-recipe-instruction-group-name')
+              .first()
+              .text()
+          )
+
+          const steps: string[] = []
+          $(group)
+            .find('.wprm-recipe-instruction')
+            .each((___, instruction) => {
+              const raw =
+                $(instruction).find('.wprm-recipe-instruction-text').text() ||
+                $(instruction).text()
+              const stepText = normalizeText(raw)
+              if (stepText) {
+                steps.push(stepText)
+              }
+            })
+
+          if (steps.length > 0) {
+            instructionSections.push({
+              section: sectionName || undefined,
+              steps,
+            })
+          }
+        })
+    })
+  }
+
+  const filteredIngredients = ingredientSections
+    .map((section) => ({
+      section: section.section,
+      items: section.items.filter((item) => !!item),
+    }))
+    .filter((section) => section.items.length > 0)
+
+  const filteredInstructions = instructionSections
+    .map((section) => ({
+      section: section.section,
+      steps: section.steps.filter((step) => !!step),
+    }))
+    .filter((section) => section.steps.length > 0)
+
+  if (filteredIngredients.length === 0 && filteredInstructions.length === 0) {
+    return null
+  }
+
+  return {
+    ingredientSections: filteredIngredients,
+    instructionSections: filteredInstructions,
+  }
+}
 
 /**
  * Zod schema for AI-extracted recipe structure
@@ -417,6 +608,17 @@ function extractTextFromHTML(html: string): string {
     })
   })
   
+  const detectListHeading = ($li: cheerio.Cheerio, text: string): string | null => {
+    if (!text) return null
+    const strongText = $li.find('strong, b').text().replace(/\s+/g, ' ').trim()
+    if (!strongText) return null
+    const normalizedStrong = strongText.replace(/[:\s]+$/, '').trim()
+    const normalizedText = text.replace(/[:\s]+$/, '').trim()
+    if (!normalizedStrong || normalizedStrong !== normalizedText) return null
+    if (QUANTITY_PATTERN.test(normalizedStrong)) return null
+    return strongText.trim()
+  }
+
   $content('ul, ol').each((_, list) => {
     const $list = $content(list)
     const items: string[] = []
@@ -426,11 +628,21 @@ function extractTextFromHTML(html: string): string {
         ? (listNode.name || '').toLowerCase()
         : ''
     const isOrdered = tagName === 'ol'
+    let orderedIndex = 0
     
-    $list.children('li').each((idx, li) => {
-      const itemText = $content(li).text().replace(/\s+/g, ' ').trim()
+    $list.children('li').each((_, li) => {
+      const $li = $content(li)
+      const itemText = $li.text().replace(/\s+/g, ' ').trim()
       if (!itemText) return
-      const prefix = isOrdered ? `${idx + 1}. ` : '- '
+      const headingText = detectListHeading($li, itemText)
+      if (headingText) {
+        items.push(`=== ${headingText} ===`)
+        return
+      }
+      if (isOrdered) {
+        orderedIndex += 1
+      }
+      const prefix = isOrdered ? `${orderedIndex}. ` : '- '
       items.push(`${prefix}${itemText}`)
     })
     
@@ -760,64 +972,6 @@ ${content.substring(0, 8000)}`
 }
 
 /**
- * Convert structured ingredients to flat array format for Supabase
- */
-function formatIngredientsForSupabase(
-  ingredientSections: RecipeExtraction['ingredientSections']
-): string[] {
-  const result: string[] = []
-  
-  for (const section of ingredientSections) {
-    if (section.section) {
-      result.push(`${section.section.toUpperCase()}:`)
-    }
-    for (const item of section.items) {
-      result.push(section.section ? `- ${item}` : item)
-    }
-  }
-  
-  return result
-}
-
-/**
- * Convert structured instructions to string format for Supabase
- */
-function formatInstructionsForSupabase(
-  instructionSections: RecipeExtraction['instructionSections']
-): string {
-  const parts: string[] = []
-  
-  for (const section of instructionSections) {
-    if (section.section) {
-      parts.push(`${section.section.toUpperCase()}:`)
-    }
-    for (const step of section.steps) {
-      parts.push(step)
-    }
-  }
-  
-  return parts.join('\n\n')
-}
-
-/**
- * Format additional metadata as JSON string for notes field
- */
-function formatMetadataForNotes(recipe: RecipeExtraction): string {
-  const metadata: any = {}
-  
-  if (recipe.description) metadata.description = recipe.description
-  if (recipe.servings) metadata.servings = recipe.servings
-  if (recipe.prepTime) metadata.prepTime = recipe.prepTime
-  if (recipe.cookTime) metadata.cookTime = recipe.cookTime
-  if (recipe.totalTime) metadata.totalTime = recipe.totalTime
-  if (recipe.cuisine) metadata.cuisine = recipe.cuisine
-  if (recipe.mealType) metadata.mealType = recipe.mealType
-  if (recipe.nutrition) metadata.nutrition = recipe.nutrition
-  
-  return Object.keys(metadata).length > 0 ? JSON.stringify(metadata, null, 2) : ''
-}
-
-/**
  * POST /api/import/ai
  * 
  * Accepts either FormData or JSON:
@@ -864,6 +1018,7 @@ export async function POST(req: Request) {
     let sourceUrl: string | null = null
     let imageUrl: string | null = null
     let imageBuffer: Buffer | null = null // Store image buffer for later upload
+    let wprmStructuredData: WprmStructuredData | null = null
 
     if (url) {
       // Fetch HTML from URL
@@ -882,6 +1037,7 @@ export async function POST(req: Request) {
         }
 
         const htmlContent = await response.text()
+        wprmStructuredData = extractWprmStructuredData(htmlContent)
         content = extractTextFromHTML(htmlContent)
         contentSourceType = 'html'
         sourceUrl = url
@@ -899,6 +1055,7 @@ export async function POST(req: Request) {
       }
     } else if (html) {
       // Use provided HTML
+      wprmStructuredData = extractWprmStructuredData(html)
       content = extractTextFromHTML(html)
       contentSourceType = 'html'
     } else if (imageFile) {
@@ -985,19 +1142,33 @@ export async function POST(req: Request) {
       )
     }
 
+    if (wprmStructuredData) {
+      const overrides: Partial<RecipeExtraction> = {}
+      if (wprmStructuredData.ingredientSections.length > 0) {
+        overrides.ingredientSections = wprmStructuredData.ingredientSections
+      }
+      if (wprmStructuredData.instructionSections.length > 0) {
+        overrides.instructionSections = wprmStructuredData.instructionSections
+      }
+
+      if (Object.keys(overrides).length > 0) {
+        extractedRecipe = { ...extractedRecipe, ...overrides }
+      }
+    }
+
     // Use sourceUrl from extracted recipe if available, otherwise use provided URL
     const finalSourceUrl = extractedRecipe.sourceUrl || sourceUrl
-
-    // Prepare recipe data for Supabase
-    const ingredients = formatIngredientsForSupabase(extractedRecipe.ingredientSections)
-    const instructions = formatInstructionsForSupabase(extractedRecipe.instructionSections)
+    
+    // Prepare recipe data for Supabase (store structured sections to keep headers)
+    const ingredients = normalizeIngredientSections(extractedRecipe.ingredientSections)
+    const instructions = normalizeInstructionSections(extractedRecipe.instructionSections)
     const metadataNotes = formatMetadataForNotes(extractedRecipe)
     const tags = extractedRecipe.tags || []
 
     const recipeData: any = {
       title: extractedRecipe.title,
       ingredients,
-      instructions: instructions || 'No instructions found',
+      instructions,
       tags,
       source_url: finalSourceUrl,
       notes: metadataNotes || null,
