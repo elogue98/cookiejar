@@ -405,7 +405,10 @@ function extractTextFromHTML(html: string): string {
       if ($el.children().length === 1) {
         const firstChild = $el.children().first()
         const firstChildNode = firstChild.get(0) as cheerio.Element | undefined
-        const tagName = (firstChildNode?.name || '').toLowerCase()
+        const tagName =
+          firstChildNode && firstChildNode.type === 'tag'
+            ? (firstChildNode.name || '').toLowerCase()
+            : ''
         const childText = firstChild.text().replace(/\s+/g, ' ').trim()
         if (childText && childText === elementText && ['strong', 'b'].includes(tagName)) {
           $el.replaceWith(`\n\n=== ${childText} ===\n`)
@@ -417,7 +420,11 @@ function extractTextFromHTML(html: string): string {
   $content('ul, ol').each((_, list) => {
     const $list = $content(list)
     const items: string[] = []
-    const tagName = (($list.get(0) as cheerio.Element)?.name || '').toLowerCase()
+    const listNode = $list.get(0) as cheerio.Element | undefined
+    const tagName =
+      listNode && listNode.type === 'tag'
+        ? (listNode.name || '').toLowerCase()
+        : ''
     const isOrdered = tagName === 'ol'
     
     $list.children('li').each((idx, li) => {
