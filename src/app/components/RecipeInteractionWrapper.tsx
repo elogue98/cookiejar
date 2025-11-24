@@ -53,11 +53,12 @@ const PREP_WORDS = [
   'active', 'dry', 'instant', 'quick', 'rise', 'plain', 'all-purpose', 'regular', 'fast', 'action',
   'cut', 'cutting', 'cooled', 'cool', 'cooling', 'chilled', 'refrigerated',
   'refrigerator', 'fridge', 'freezer', 'stored', 'leftover', 'leftovers',
-  'half', 'halves', 'third', 'thirds', 'quarter', 'quarters'
+  'half', 'halves', 'third', 'thirds', 'quarter', 'quarters',
+  'plus', 'more'
 ]
 
 const STOP_WORDS = [
-  'and', 'or', 'the', 'a', 'an', 'of', 'in', 'with', 'for', 'to', 'from', 'into'
+  'and', 'or', 'the', 'a', 'an', 'of', 'in', 'with', 'for', 'to', 'from', 'into', 'as'
 ]
 
 const UNIT_REGEX = new RegExp(`\\b(${UNIT_WORDS.join('|')})\\b`, 'gi')

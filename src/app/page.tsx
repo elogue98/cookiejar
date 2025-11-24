@@ -1,27 +1,9 @@
 import { supabase } from '@/lib/supabaseClient'
-import RecipeList from './components/RecipeList'
-import Navigation from './components/Navigation'
+import HomePageContent from './components/HomePageContent'
+import type { Recipe } from '@/types/recipe'
 
 export const revalidate = 0
 export const dynamic = 'force-dynamic'
-
-interface Recipe {
-  id: string
-  title: string
-  rating: number | null
-  tags: string[] | null
-  ingredients: string[] | null
-  image_url: string | null
-  instructions: string | null
-  created_at: string | null
-  cookbookSource: string | null
-  created_by?: string | null
-  creator?: {
-    id: string
-    name: string
-    avatar_url: string
-  } | null
-}
 
 export default async function Home() {
   const { data: recipes, error } = await supabase
@@ -117,25 +99,16 @@ export default async function Home() {
     }
   })
 
+  const errorMessage = error?.message ?? null
+  const errorHint = error
+    ? error.hint || 'Please check your Supabase connection and ensure the "recipes" table exists.'
+    : null
+
   return (
-    <div className="min-h-screen bg-[#F2F4F6] text-[#2B2B2B]">
-      <Navigation />
-      
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {error ? (
-          <div className="rounded-lg border border-red-600 bg-red-50 p-4">
-            <p className="text-red-700 font-semibold mb-2">Error loading recipes</p>
-            <p className="text-red-600 text-sm">
-              {error.message || 'Unable to fetch recipes from database'}
-            </p>
-            <p className="text-red-700 text-xs mt-2">
-              {error.hint || 'Please check your Supabase connection and ensure the "recipes" table exists.'}
-            </p>
-          </div>
-        ) : (
-          <RecipeList recipes={recipesWithAverageRatings} />
-        )}
-      </main>
-    </div>
+    <HomePageContent
+      recipes={recipesWithAverageRatings}
+      errorMessage={errorMessage}
+      errorHint={errorHint}
+    />
   )
 }
