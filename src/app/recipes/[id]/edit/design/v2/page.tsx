@@ -18,7 +18,6 @@ interface Recipe {
   created_at: string | null
   source_url: string | null
   cookbookSource: string | null
-  image_url: string | null
 }
 
 type NutritionMetadata = {
@@ -48,7 +47,6 @@ export default function StructuredEditPage() {
   const [recipe, setRecipe] = useState<Recipe | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
   const [activeTab, setActiveTab] = useState<'details' | 'ingredients' | 'instructions'>('details')
 
   // Form state
@@ -58,7 +56,6 @@ export default function StructuredEditPage() {
   const [tags, setTags] = useState('')
   const [rating, setRating] = useState<string>('')
   const [sourceUrl, setSourceUrl] = useState('')
-  const [imageUrl, setImageUrl] = useState('')
   
   // Metadata
   const [description, setDescription] = useState('')
@@ -83,7 +80,6 @@ export default function StructuredEditPage() {
 
         setRecipe(data)
         setTitle(data.title || '')
-        setImageUrl(data.image_url || '')
         
         // Ingredients parsing
         if (data.ingredients && Array.isArray(data.ingredients)) {
@@ -183,89 +179,6 @@ export default function StructuredEditPage() {
     })
   }
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return
-    
-    const file = e.target.files[0]
-    setUploading(true)
-
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const res = await fetch(`/api/recipes/${id}/image`, {
-        method: 'POST',
-        body: formData,
-      })
-
-      const data = await res.json()
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to upload image')
-      }
-
-      setImageUrl(data.imageUrl)
-      setUploading(false)
-    } catch (error) {
-      console.error('Error uploading image:', error)
-      alert('Failed to upload image. Please try again.')
-      setUploading(false)
-    }
-  }
-
-  const parseSectionLabel = (text: string): string | null => {
-    const trimmed = text.trim()
-    if (!trimmed) return null
-
-    const sectionPrefixMatch = trimmed.match(/^section\s*:\s*(.+)$/i)
-    if (sectionPrefixMatch) {
-      return sectionPrefixMatch[1].trim()
-    }
-
-    const withoutTrailingColon = trimmed.endsWith(':')
-      ? trimmed.slice(0, -1).trim()
-      : trimmed
-
-    if (!withoutTrailingColon) return null
-
-    const commonHeaders = [
-      'ingredients',
-      'ingredient',
-      'instructions',
-      'instruction',
-      'directions',
-      'direction',
-      'method',
-      'dough',
-      'batter',
-      'filling',
-      'glaze',
-      'topping',
-      'assembly',
-      'icing',
-      'frosting',
-      'garnish'
-    ]
-
-    if (
-      commonHeaders.some((header) =>
-        withoutTrailingColon.toLowerCase().startsWith(header)
-      )
-    ) {
-      return withoutTrailingColon
-    }
-
-    if (
-      withoutTrailingColon === withoutTrailingColon.toUpperCase() &&
-      withoutTrailingColon.length <= 60 &&
-      !/\d/.test(withoutTrailingColon)
-    ) {
-      return withoutTrailingColon
-    }
-
-    return null
-  }
-
   const handleSave = async () => {
     if (!title.trim()) return
     setSaving(true)
@@ -281,62 +194,14 @@ export default function StructuredEditPage() {
 
     const notesToSave = Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null
 
-    // Helper to convert flat list with SECTION markers into structured array
-    const buildStructuredList = (list: string[], itemKey: 'items' | 'steps') => {
-      const groups: { section: string; items?: string[]; steps?: string[] }[] = []
-      let currentGroup: { section: string; items?: string[]; steps?: string[] } = { 
-        section: '', 
-        [itemKey]: [] 
-      }
-
-      list.forEach((rawValue) => {
-        const value = rawValue.trim()
-        if (!value) return
-
-        const potentialSection = parseSectionLabel(value)
-
-        if (potentialSection !== null) {
-          if (
-            (itemKey === 'items' && currentGroup.items && currentGroup.items.length > 0) ||
-            (itemKey === 'steps' && currentGroup.steps && currentGroup.steps.length > 0) ||
-            currentGroup.section
-          ) {
-            groups.push(currentGroup)
-          }
-
-          currentGroup = {
-            section: potentialSection,
-            [itemKey]: []
-          }
-        } else {
-          if (itemKey === 'items') {
-            currentGroup.items!.push(value)
-          } else {
-            currentGroup.steps!.push(value)
-          }
-        }
-      })
-
-      if (
-        (itemKey === 'items' && currentGroup.items && currentGroup.items.length > 0) ||
-        (itemKey === 'steps' && currentGroup.steps && currentGroup.steps.length > 0) ||
-        currentGroup.section
-      ) {
-        groups.push(currentGroup)
-      }
-
-      return groups.length > 0 ? groups : []
-    }
-
-    // Build structured data
-    const structuredIngredients = buildStructuredList(
-      ingredientList.filter((i) => i.trim()),
-      'items'
-    )
-    const structuredInstructions = buildStructuredList(
-      instructionList.filter((i) => i.trim()),
-      'steps'
-    )
+    // Convert lists back to strings/arrays for API
+    const ingredients = ingredientList.filter(i => i.trim()) // API expects array or string, we'll send array if possible or just let the API handle it. Wait, API handles string[] or string.
+    // Actually the API expects `ingredients` as string (newline separated) OR structured array.
+    // Let's send string joined by newline for compatibility with existing logic which parses it?
+    // Wait, existing logic in edit page sets ingredients as string.
+    // Let's mimic the default edit page: convert list to newline separated string
+    const ingredientsStr = ingredients.join('\n')
+    const instructionsStr = instructionList.filter(i => i.trim()).join('\n\n')
 
     try {
       const res = await fetch(`/api/recipes/${id}`, {
@@ -344,8 +209,8 @@ export default function StructuredEditPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
-          ingredients: structuredIngredients, // Send structured data directly
-          instructions: structuredInstructions, // Send structured data directly
+          ingredients: ingredientsStr,
+          instructions: instructionsStr,
           tags,
           rating: rating || null,
           notes: notesToSave,
@@ -374,7 +239,7 @@ export default function StructuredEditPage() {
               ← Cancel
             </Link>
             <div className="h-6 w-px bg-slate-200"></div>
-            <span className="font-semibold text-slate-700">Edit Recipe</span>
+            <span className="font-semibold text-slate-700">Structured Editor</span>
           </div>
           <button
             onClick={handleSave}
@@ -421,47 +286,7 @@ export default function StructuredEditPage() {
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                   <h2 className="text-xl font-bold mb-6">Basic Info</h2>
-                  <div className="space-y-6">
-                    {/* Image Upload Section */}
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Recipe Photo</label>
-                      <div className="flex items-center gap-6">
-                        <div className="w-32 h-32 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden relative">
-                          {imageUrl ? (
-                            <img src={imageUrl} alt="Recipe preview" className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-4xl text-slate-300">📷</span>
-                          )}
-                          {uploading && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <label className="inline-block px-4 py-2 bg-white border border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700 text-center">
-                            {uploading ? 'Uploading...' : imageUrl ? 'Change Photo' : 'Upload Photo'}
-                            <input 
-                              type="file" 
-                              className="hidden" 
-                              accept="image/*"
-                              onChange={handleImageUpload}
-                              disabled={uploading}
-                            />
-                          </label>
-                          {imageUrl && (
-                            <button 
-                              onClick={() => setImageUrl('')}
-                              className="text-xs text-red-500 hover:text-red-700"
-                            >
-                              Remove Photo
-                            </button>
-                          )}
-                          <p className="text-xs text-slate-500">JPG, PNG or WebP up to 5MB</p>
-                        </div>
-                      </div>
-                    </div>
-
+                  <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
                       <input
@@ -628,3 +453,4 @@ export default function StructuredEditPage() {
     </div>
   )
 }
+

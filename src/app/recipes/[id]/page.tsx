@@ -58,6 +58,7 @@ function cleanInstruction(raw: string): string {
 function cleanSectionHeader(raw: string): string {
   return raw
     .replace(/^\d+[\).]?\s*/, '')
+    .replace(/^section\s*:\s*/i, '')
     .replace(/:\s*$/, '')
     .trim()
     .replace(/\s+/g, ' ')
@@ -72,6 +73,7 @@ function formatTime(time: string): string {
 function isSectionHeader(text: string): boolean {
   const t = text.trim()
   if (!t) return false
+  if (/^section\s*:/i.test(t)) return true
   const withoutNumber = t.replace(/^\d+[\).]?\s*/, '')
   const stripped = withoutNumber.replace(/:\s*$/, '').trim()
   if (/\d/.test(stripped)) return false

@@ -123,12 +123,17 @@ function getHeadNoun(tokens: string[]): string | null {
   return tokens.length > 0 ? tokens[tokens.length - 1] : null
 }
 
-const stripTrailing = (value: string) => value.replace(/[:.]\s*$/, '').trim().toLowerCase()
+const stripTrailing = (value: string) =>
+  value.replace(/[:.]\s*$/, '').trim().toLowerCase()
 
 function normalizeIngredientGroups(groups: IngredientGroup[]): IngredientGroup[] {
   return groups.map((group) => {
-    const section = group.section?.trim() || ''
-    const normalizedSection = stripTrailing(section)
+    const rawSection = group.section?.trim() || ''
+    const cleanedSection = rawSection.replace(/^section\s*:\s*/i, '').trim()
+    let normalizedSection = stripTrailing(cleanedSection)
+    if (/^ingredients?$/i.test(normalizedSection)) {
+      normalizedSection = ''
+    }
     const cleanedItems = (group.items || [])
       .map((item) => (item || '').trim())
       .filter((item) => item.length > 0)
@@ -137,14 +142,20 @@ function normalizeIngredientGroups(groups: IngredientGroup[]): IngredientGroup[]
         return stripTrailing(item) !== normalizedSection
       })
 
-    return { section, items: cleanedItems }
+    const sectionForDisplay = normalizedSection ? cleanedSection : ''
+
+    return { section: sectionForDisplay, items: cleanedItems }
   })
 }
 
 function normalizeInstructionGroups(groups: InstructionGroup[]): InstructionGroup[] {
   return groups.map((group) => {
-    const section = group.section?.trim() || ''
-    const normalizedSection = stripTrailing(section)
+    const rawSection = group.section?.trim() || ''
+    const cleanedSection = rawSection.replace(/^section\s*:\s*/i, '').trim()
+    let normalizedSection = stripTrailing(cleanedSection)
+    if (/^(instructions?|directions?)$/i.test(normalizedSection)) {
+      normalizedSection = ''
+    }
     const cleanedSteps = (group.steps || [])
       .map((step) => (step || '').trim())
       .filter((step) => step.length > 0)
@@ -153,7 +164,9 @@ function normalizeInstructionGroups(groups: InstructionGroup[]): InstructionGrou
         return stripTrailing(step) !== normalizedSection
       })
 
-    return { section, steps: cleanedSteps }
+    const sectionForDisplay = normalizedSection ? cleanedSection : ''
+
+    return { section: sectionForDisplay, steps: cleanedSteps }
   })
 }
 
@@ -382,6 +395,11 @@ export default function RecipeInteractionWrapper({ ingredients, instructions, ch
 
   const normalizedInstructions = useMemo(() => normalizeInstructionGroups(instructions), [instructions])
 
+  const hasInstructionSections = useMemo(
+    () => normalizedInstructions.some((group) => group.section && group.section.trim().length > 0),
+    [normalizedInstructions]
+  )
+
   const ingredientMapping = useMemo(() => {
     return mapIngredientsToSteps(normalizedIngredients, normalizedInstructions)
   }, [normalizedIngredients, normalizedInstructions])
@@ -482,6 +500,9 @@ export default function RecipeInteractionWrapper({ ingredients, instructions, ch
          <section className="mb-16">
             {normalizedInstructions.length > 0 ? (
               <div className="space-y-10">
+                {!hasInstructionSections && (
+                  <h3 className="text-xl font-bold mb-6 text-slate-800">Instructions</h3>
+                )}
                  {normalizedInstructions.map((group, idx) => (
                    <div key={idx}>
                      {group.section && <h3 className="text-xl font-bold mb-6 text-slate-800">{group.section}</h3>}
