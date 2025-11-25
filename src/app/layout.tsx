@@ -9,9 +9,22 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+const faviconPath = "/icon.png";
+
 export const metadata: Metadata = {
   title: "Cookie Jar",
   description: "Your personal recipe collection",
+  icons: {
+    icon: [
+      {
+        url: faviconPath,
+        type: "image/png",
+        sizes: "any",
+      },
+    ],
+    shortcut: [{ url: faviconPath, type: "image/png" }],
+    apple: [{ url: faviconPath, type: "image/png" }],
+  },
 };
 
 export default function RootLayout({

@@ -75,6 +75,8 @@ const FRACTION_MAP: Record<string, string> = {
 const APPROX_PREFIX = /^(?:about|approximately|approx\.?|around|roughly|nearly)\s+/i
 const METRIC_PAREN_PATTERN =
   /\((?:[^)]*\b(?:ml|millilit(er|re)s?|g|grams?|grammes?|kg|kilograms?|l|liters?|litres?)\b[^)]*)\)/i
+const EXISTING_METRIC_PATTERN =
+  /\b\d+(?:\.\d+)?\s*(?:g|grams?|grammes?|kg|kilograms?|ml|milliliters?|millilitres?|l|liters?|litres?)\b/i
 
 const OPTIONAL_ADJECTIVE = /^(?:heaping|packed|scant|level|rounded|generous|heaped)\s+/i
 
@@ -222,6 +224,13 @@ const INGREDIENT_OVERRIDES: IngredientOverride[] = [
     },
   },
   {
+    pattern: /\bbaking (soda|powder)\b/i,
+    conversions: {
+      tablespoon: { metricUnit: 'g', ratio: 15 },
+      teaspoon: { metricUnit: 'g', ratio: 5 },
+    },
+  },
+  {
     pattern: /\b(berries|strawberries|blueberries|raspberries|blackberries)\b/i,
     conversions: {
       cup: { metricUnit: 'g', ratio: 140 },
@@ -268,13 +277,15 @@ const DEFAULT_SOLID_RATIOS: Partial<Record<UnitId, number>> = {
   teaspoon: 3,
 }
 
+const UNITS_WITHOUT_CONVERSION = new Set<UnitId>(['teaspoon', 'tablespoon'])
+
 const RANGE_SEPARATOR_PATTERN = /\s*(?:to|through|thru|or)\s*/gi
 
 /**
  * Append a metric conversion snippet using heuristics only (synchronous).
  */
 export function appendMetricMeasurement(line: string): string {
-  if (!line || METRIC_PAREN_PATTERN.test(line)) {
+  if (!line || hasExistingMetric(line)) {
     return line
   }
 
@@ -293,7 +304,7 @@ export async function appendMetricMeasurementWithAI(
   line: string,
   options?: AppendMetricOptions
 ): Promise<string> {
-  if (!line || METRIC_PAREN_PATTERN.test(line)) {
+  if (!line || hasExistingMetric(line)) {
     return line
   }
 
@@ -325,6 +336,10 @@ function analyzeLine(line: string): ConversionAnalysis | null {
 
   const measurement = parseMeasurement(trimmed)
   if (!measurement) {
+    return null
+  }
+
+  if (UNITS_WITHOUT_CONVERSION.has(measurement.unit.id)) {
     return null
   }
 
@@ -592,6 +607,10 @@ function isSolid(text: string): boolean {
     INGREDIENT_OVERRIDES.some((override) => override.pattern.test(text)) ||
     SOLID_KEYWORDS.some((pattern) => pattern.test(text))
   )
+}
+
+function hasExistingMetric(line: string): boolean {
+  return METRIC_PAREN_PATTERN.test(line) || EXISTING_METRIC_PATTERN.test(line)
 }
 
 async function getAiConversion(

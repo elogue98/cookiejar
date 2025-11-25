@@ -22,11 +22,15 @@ describe('appendMetricMeasurement', () => {
     expect(appendMetricMeasurement('1-2 cups flour')).toBe('1-2 cups flour (125-250 g)')
   })
 
-  it('converts verbal ranges', () => {
+  it('leaves tablespoon measurements unchanged', () => {
     expect(appendMetricMeasurement('1 to 2 tablespoons olive oil')).toBe(
-      '1 to 2 tablespoons olive oil (15-30 ml)'
+      '1 to 2 tablespoons olive oil'
     )
   })
+  it('leaves teaspoon measurements unchanged', () => {
+    expect(appendMetricMeasurement('2 teaspoons kosher salt')).toBe('2 teaspoons kosher salt')
+  })
+
 
   it('converts approximate values like 3-ish cups', () => {
     expect(appendMetricMeasurement('3-ish cups chicken broth')).toBe(
