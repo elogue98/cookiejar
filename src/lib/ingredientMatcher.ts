@@ -156,10 +156,10 @@ const SYNONYM_MAP: Record<string, string[]> = {
   rocket: ['arugula'],
   yogurt: ['yoghurt', 'yogurt'],
   yoghurt: ['yogurt'],
-  chilli: ['chili', 'chilies', 'chillies'],
-  chili: ['chilli', 'chilies', 'chillies'],
+  chilli: ['chili', 'chilies', 'chillies', 'chile'],
+  chili: ['chilli', 'chilies', 'chillies', 'chile'],
   flour: ['all-purpose flour', 'plain flour'],
-  sugar: ['caster', 'powdered', 'icing', 'confectioners'],
+  sugar: ['caster', 'powdered', 'icing', 'confectioners', 'brown sugar'],
   corn: ['sweetcorn', 'kernels'],
   bicarbonate: ['baking', 'soda', 'bicarb'],
   soda: ['bicarbonate'],
@@ -168,12 +168,7 @@ const SYNONYM_MAP: Record<string, string[]> = {
   salmon: ['fillet', 'filet'],
   noodle: ['noodles', 'udon', 'ramen', 'spaghetti'],
   tofu: ['bean curd'],
-  chili: ['chilli', 'chile'],
-  chilli: ['chili', 'chile'],
-  sugar: ['brown sugar'],
   crisp: ['crisps'],
-  prawn: ['shrimp', 'shrimps'],
-  shrimp: ['prawn', 'prawns'],
 }
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

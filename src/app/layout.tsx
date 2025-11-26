@@ -1,13 +1,7 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { UserProvider } from "@/lib/userContext";
 import { Analytics } from "@vercel/analytics/next";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
 
 const faviconPath = "/icon.png";
 
@@ -35,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="light" style={{ colorScheme: 'light' }}>
       <body
-        className={`${inter.variable} font-sans antialiased`}
+        className="font-sans antialiased"
         style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}
       >
         <UserProvider>

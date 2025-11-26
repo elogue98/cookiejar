@@ -169,6 +169,7 @@ export function evaluateSamples(samples: HighlightSample[]): EvaluationResult {
       totalTP,
       totalFP,
       totalFN,
+      skippedUnlabeled: 0,
     },
   }
 }

@@ -206,11 +206,11 @@ export default async function RecipeDetail({ params, searchParams }: PageProps) 
     averageRating = recipe.rating
   }
 
-  let normalizedIngredients: { section: string; items: string[] }[] | null = null
+let normalizedIngredients: IngredientGroup[] | null = null
   if (recipe.ingredients) {
     if (Array.isArray(recipe.ingredients)) {
       if (isIngredientGroupArray(recipe.ingredients)) {
-        normalizedIngredients = (recipe.ingredients as { section: string; items: string[] }[]).map(group => {
+        normalizedIngredients = (recipe.ingredients as IngredientGroup[]).map(group => {
           const cleanedSection = cleanSectionHeader(group.section || '')
           const cleanedItems = (group.items || [])
             .map(cleanIngredient)
@@ -232,11 +232,11 @@ export default async function RecipeDetail({ params, searchParams }: PageProps) 
     }
   }
 
-  let normalizedInstructions: { section: string; steps: string[] }[] | null = null
+let normalizedInstructions: InstructionGroup[] | null = null
   if (recipe.instructions) {
     if (Array.isArray(recipe.instructions)) {
       if (isInstructionGroupArray(recipe.instructions)) {
-        normalizedInstructions = (recipe.instructions as { section: string; steps: string[] }[]).map((group) => {
+        normalizedInstructions = (recipe.instructions as InstructionGroup[]).map((group) => {
           const cleanedSection = cleanSectionHeader(group.section || '')
           const cleanedSteps = (group.steps || [])
             .map(cleanInstruction)
@@ -397,8 +397,8 @@ export default async function RecipeDetail({ params, searchParams }: PageProps) 
       */}
       
       <RecipeInteractionWrapper 
-        ingredients={recipeData.ingredients || []} 
-        instructions={recipeData.instructions || []}
+        ingredients={(normalizedIngredients || []) as IngredientGroup[]} 
+        instructions={(normalizedInstructions || []) as InstructionGroup[]}
         expectedMatches={recipeData.expected_matches || undefined}
       >
         {{
@@ -587,7 +587,13 @@ export default async function RecipeDetail({ params, searchParams }: PageProps) 
         }}
       </RecipeInteractionWrapper>
 
-      <CookieBot recipeId={id} recipeTitle={recipeData.title} ingredients={recipeData.ingredients} instructions={recipeData.instructions} tags={recipeData.tags} />
+      <CookieBot
+        recipeId={id}
+        recipeTitle={recipeData.title}
+        ingredients={normalizedIngredients || []}
+        instructions={normalizedInstructions || []}
+        tags={recipeData.tags}
+      />
     </div>
   )
 }

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useUser } from '@/lib/userContext'
+import type { IngredientGroup, InstructionGroup } from '@/types/recipe'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -11,8 +12,8 @@ interface Message {
 interface CookieBotProps {
   recipeId: string
   recipeTitle: string
-  ingredients: { section: string; items: string[] }[] | null
-  instructions: { section: string; steps: string[] }[] | null
+  ingredients: IngredientGroup[] | null
+  instructions: InstructionGroup[] | null
   tags: string[] | null
 }
 
