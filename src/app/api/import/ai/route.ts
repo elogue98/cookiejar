@@ -490,7 +490,7 @@ function extractTextFromHTML(html: string): string {
   // We build this later, but declare early so TDZ issues don't occur if used in early returns
   let metadataText = ''
 
-  const detectInlineRecipe = ($: cheerio.CheerioAPI) => {
+  const detectInlineRecipe = ($: ReturnType<typeof cheerio.load>) => {
     const candidates: {
       ingredients: string[]
       instructions: string[]

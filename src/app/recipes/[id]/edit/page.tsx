@@ -55,7 +55,7 @@ export default function StructuredEditPage() {
         // Ingredients parsing
         if (data.ingredients && Array.isArray(data.ingredients)) {
           const list: string[] = []
-          data.ingredients.forEach((item) => {
+          data.ingredients.forEach((item: string | IngredientGroup) => {
             if (typeof item === 'string') {
               list.push(item)
             } else if (item && typeof item === 'object' && 'items' in item) {
@@ -71,7 +71,11 @@ export default function StructuredEditPage() {
         if (data.instructions) {
           if (Array.isArray(data.instructions)) {
             const steps: string[] = []
-            data.instructions.forEach((group) => {
+            data.instructions.forEach((group: InstructionGroup | string) => {
+              if (typeof group === 'string') {
+                steps.push(group)
+                return
+              }
               const typedGroup = group as InstructionGroup
               if (typedGroup.section) steps.push(`SECTION: ${typedGroup.section}`)
               if (Array.isArray(typedGroup.steps)) steps.push(...typedGroup.steps)
