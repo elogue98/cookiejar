@@ -33,7 +33,7 @@ export default function WelcomeLanding() {
             </h1>
 
             <p className="text-xl text-slate-600 mb-10 max-w-lg leading-relaxed">
-              Import from any website, scan your physical cookbooks, and build a personal database that's actually searchable.
+              Import from any website, scan your physical cookbooks, and build a personal database that&apos;s actually searchable.
             </p>
 
             <div className="flex flex-wrap gap-4">
@@ -119,5 +119,4 @@ export default function WelcomeLanding() {
     </div>
   )
 }
-
 

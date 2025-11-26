@@ -60,7 +60,7 @@ type AppendMetricOptions = {
   aiProvider?: AiConversionProvider
 }
 
-const FRACTION_MAP: Record<string, string> = {
+export const FRACTION_MAP: Record<string, string> = {
   '¼': '1/4',
   '½': '1/2',
   '¾': '3/4',
@@ -164,6 +164,8 @@ const UNIT_ALIASES: UnitAlias[] = UNIT_DEFINITIONS.flatMap((definition) =>
     definition,
   }))
 ).sort((a, b) => b.alias.length - a.alias.length)
+
+export const UNIT_ALIAS_TERMS = UNIT_ALIASES.map((entry) => entry.alias)
 
 type IngredientOverride = {
   pattern: RegExp
@@ -548,7 +550,7 @@ function determineConversion(
   line: string,
   measurement: Measurement
 ): MetricConversion | null {
-  const { unit, ingredientText } = measurement
+  const { unit } = measurement
   const normalized = line.toLowerCase()
 
   for (const override of INGREDIENT_OVERRIDES) {
@@ -718,5 +720,4 @@ Respond with: {"metricUnit":"g","valuePerUnit":30}`
 
   return defaultAiProviderPromise
 }
-
 

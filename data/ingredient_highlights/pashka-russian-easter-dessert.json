@@ -1,0 +1,66 @@
+{
+  "id": "pashka-russian-easter-dessert",
+  "title": "Pashka – Russian Easter dessert",
+  "sourceUrl": "https://www.greatbritishchefs.com/recipes/pashka-recipe",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "3 egg yolks, beaten",
+        "240ml of whipping cream",
+        "120g of caster sugar",
+        "60ml of runny honey",
+        "1 tsp vanilla extract",
+        "1 tbsp of brandy",
+        "900g of curd cheese, cottage or cream cheese, strained",
+        "60g of unsalted butter",
+        "100g of mixed dried fruits",
+        "50g of flaked almonds",
+        "glacé cherries",
+        "whole blanched almonds"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "To begin, mix the eggs yolks and whipping cream together in a medium saucepan, then stir in the sugar and honey",
+        "Heat the mixture over a low heat until the mixture just coats the back of a spoon – be careful that you do not curdle the eggs",
+        "Add the vanilla extract and brandy and stir well. Place the custard in a cool place until it is cold",
+        "Place the cheese into a blender with the butter and blend until smooth",
+        "Stir the cheese mixture into the cold custard and mix gently until smooth",
+        "Add the dried fruit and nuts, mix well and then spoon into a 1200ml/2pint buttered pudding bowl",
+        "Refrigerate for 24 hours before serving, draining off any excess liquid before unmoulding onto a serving platter. Once turned out, decorate the top with the glacé cherries and blanched almonds"
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-0",
+      "0-1",
+      "0-2",
+      "0-3"
+    ],
+    "step-1": [
+      "0-0"
+    ],
+    "step-2": [
+      "0-4",
+      "0-5"
+    ],
+    "step-3": [
+      "0-7"
+    ],
+    "step-4": [],
+    "step-5": [
+      "0-7",
+      "0-8"
+    ],
+    "step-6": [
+      "0-10",
+      "0-11",
+      "0-9"
+    ]
+  }
+}

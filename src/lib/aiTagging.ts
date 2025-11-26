@@ -177,7 +177,7 @@ Return a JSON object with a "tags" property containing an array of tags. Example
     let parsed: unknown
     try {
       parsed = JSON.parse(content)
-    } catch (parseError) {
+    } catch {
       // Try to extract array if response is not valid JSON
       console.warn('Failed to parse OpenAI response as JSON, attempting fallback')
       // Fallback: try to extract array from text
@@ -271,4 +271,3 @@ Return a JSON object with a "tags" property containing an array of tags. Example
     return generateFreeTags(input)
   }
 }
-

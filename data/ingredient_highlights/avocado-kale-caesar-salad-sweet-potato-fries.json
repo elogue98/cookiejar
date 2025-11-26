@@ -1,0 +1,41 @@
+{
+  "id": "avocado-kale-caesar-salad-sweet-potato-fries",
+  "title": "Avocado Kale Caesar Salad + Sweet Potato Fries",
+  "sourceUrl": "https://pinchofyum.com/avocado-kale-caesar-salad-sweet-potato-fries",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "1 avocado, divided",
+        "1/2 cup water",
+        "1/4 cup mayonnaise (optional – see notes)",
+        "2 small cloves garlic",
+        "2 tablespoons lemon juice",
+        "1 teaspoon Dijon mustard",
+        "1/2 teaspoon salt"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Cut the avocado in half. Reserve one half for the salad. Blend the other half with the water, mayo, garlic, lemon juice, Dijon, and salt. Taste and adjust!",
+        "Toss the chopped kale with the dressing. Throw in a handful of pepitas and Parmesan and toss it all around. Finish the salad with the remaining half of the avocado, cut into cubes. YUM!"
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-0",
+      "0-1",
+      "0-4",
+      "0-6",
+      "0-3",
+      "0-5"
+    ],
+    "step-1": [
+      "0-0"
+    ]
+  }
+}

@@ -17,7 +17,7 @@ export default function NotFound() {
             Recipe not found
           </h2>
           <p className="text-[#FFE1AF]/90 mb-6">
-            The recipe you're looking for doesn't exist or has been removed.
+            The recipe you&apos;re looking for doesn&apos;t exist or has been removed.
           </p>
           <Link
             href="/"
@@ -30,4 +30,3 @@ export default function NotFound() {
     </div>
   )
 }
-

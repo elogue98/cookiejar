@@ -14,11 +14,7 @@ export default function DeleteRecipeButton({ recipeId, recipeTitle }: DeleteReci
   const [isDeleting, setIsDeleting] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isMounted, setIsMounted] = useState(false)
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
+  const portalRoot = typeof document !== 'undefined' ? document.body : null
 
   // Handle Escape key press
   useEffect(() => {
@@ -92,7 +88,7 @@ export default function DeleteRecipeButton({ recipeId, recipeTitle }: DeleteReci
         Delete Recipe
       </button>
 
-      {showConfirmModal && isMounted &&
+      {showConfirmModal && portalRoot &&
         createPortal(
           <div
             style={{
@@ -147,7 +143,7 @@ export default function DeleteRecipeButton({ recipeId, recipeTitle }: DeleteReci
                   Delete Recipe?
                 </h2>
                 <p style={{ color: 'rgba(43, 43, 43, 0.7)', fontSize: '14px', lineHeight: '1.5' }}>
-                  Are you sure you want to delete <strong>"{recipeTitle}"</strong>? This action cannot be undone and will permanently remove the recipe from your collection.
+                  Are you sure you want to delete <strong>&quot;{recipeTitle}&quot;</strong>? This action cannot be undone and will permanently remove the recipe from your collection.
                 </p>
               </div>
 
@@ -232,4 +228,3 @@ export default function DeleteRecipeButton({ recipeId, recipeTitle }: DeleteReci
     </>
   )
 }
-

@@ -142,10 +142,9 @@ export async function POST(
       console.error('Error checking existing rating:', checkError)
     }
 
-    let result
     if (existingRating) {
       // Update existing rating
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('ratings')
         .update({ rating: ratingNum, updated_at: new Date().toISOString() })
         .eq('recipe_id', id)
@@ -160,10 +159,9 @@ export async function POST(
           { status: 500 }
         )
       }
-      result = data
     } else {
       // Insert new rating
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('ratings')
         .insert({
           recipe_id: id,
@@ -180,7 +178,6 @@ export async function POST(
           { status: 500 }
         )
       }
-      result = data
     }
 
     // Get updated average rating
@@ -217,4 +214,3 @@ export async function POST(
     )
   }
 }
-

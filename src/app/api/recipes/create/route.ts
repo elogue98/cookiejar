@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     }
 
     // Prepare recipe data
-    const recipeData: any = {
+    const recipeData = {
       title: title.trim(),
       ingredients: Array.isArray(ingredients) ? ingredients : [],
       instructions: instructions || null,
@@ -146,4 +146,3 @@ export async function POST(req: Request) {
     )
   }
 }
-

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, prefer-const */
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient } from '@/lib/supabaseClient'
@@ -65,6 +66,66 @@ type JsonLdImage =
   | string
   | { url?: string | null }
   | Array<string | { url?: string | null }>
+
+type ExpectedMatchMap = Record<string, string[]>
+
+async function generateExpectedMatchesAI(
+  ingredients: StructuredListSection[],
+  instructions: StructuredInstructionSection[],
+): Promise<ExpectedMatchMap | null> {
+  try {
+    const ingLines: string[] = []
+    ingredients.forEach((group, gIdx) => {
+      (group.items || []).forEach((item, iIdx) => {
+        ingLines.push(`${gIdx}-${iIdx}: ${item}`)
+      })
+    })
+
+    const stepLines: string[] = []
+    let counter = 0
+    instructions.forEach((group) => {
+      (group.steps || []).forEach((step) => {
+        stepLines.push(`step-${counter}: ${step}`)
+        counter += 1
+      })
+    })
+
+    const prompt = `You are labeling which ingredients apply to each instruction step for a recipe.
+Return ONLY a JSON object mapping step ids to arrays of ingredient ids.
+
+Ingredients (id: text):
+${ingLines.join('\n')}
+
+Steps (id: text):
+${stepLines.join('\n')}
+
+Output format example:
+{
+  "step-0": ["0-1", "0-3"],
+  "step-1": []
+}`
+
+    const response = await aiComplete(
+      [
+        {
+          role: 'system',
+          content:
+            'You are an ingredient-to-step tagger. Return only valid JSON mapping step ids to ingredient id arrays.',
+        },
+        { role: 'user', content: prompt },
+      ],
+      { temperature: 0, response_format: { type: 'json_object' } },
+    )
+
+    const parsed = JSON.parse(response)
+    if (parsed && typeof parsed === 'object') {
+      return parsed as ExpectedMatchMap
+    }
+  } catch (err) {
+    console.warn('[import/ai] AI expectedMatches generation failed:', err)
+  }
+  return null
+}
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
@@ -426,6 +487,63 @@ function extractImageFromHTML(html: string, baseUrl: string): string | null {
  * Extract text content from HTML, including JSON-LD metadata
  */
 function extractTextFromHTML(html: string): string {
+  // We build this later, but declare early so TDZ issues don't occur if used in early returns
+  let metadataText = ''
+
+  const detectInlineRecipe = ($: cheerio.CheerioAPI) => {
+    const candidates: {
+      ingredients: string[]
+      instructions: string[]
+      title?: string
+    }[] = []
+
+    $('p').each((_, el) => {
+      const $p = $(el)
+      const brCount = $p.find('br').length
+      if (brCount < 3) return
+
+      const rawHtml = $p.html() || ''
+      const textBlock = rawHtml
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/?strong>/gi, '')
+        .replace(/&nbsp;/g, ' ')
+      const lines = textBlock
+        .split('\n')
+        .map((l) => l.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+
+      if (lines.length < 4) return
+
+      const numericLines = lines.filter((l) => /\d/.test(l))
+      if (numericLines.length < lines.length * 0.6) return
+
+      // Gather following instruction paragraphs until another heading or a gap
+      const instructions: string[] = []
+      let cursor = $p.next()
+      while (cursor.length) {
+        const tag = (cursor.get(0)?.tagName || '').toLowerCase()
+        if (tag && /^h[1-6]$/.test(tag)) break
+        if (tag !== 'p') break
+        const text = cursor.text().replace(/\s+/g, ' ').trim()
+        if (!text) break
+        instructions.push(text)
+        cursor = cursor.next()
+      }
+
+      candidates.push({
+        ingredients: lines,
+        instructions,
+      })
+    })
+
+    if (candidates.length === 0) return null
+
+    // Choose the candidate with the most ingredients
+    return candidates.reduce((best, current) =>
+      !best || current.ingredients.length > best.ingredients.length ? current : best
+    , null as typeof candidates[number] | null)
+  }
+
   const ensureArray = (value: unknown): unknown[] => {
     if (Array.isArray(value)) return value
     if (value === undefined || value === null) return []
@@ -500,8 +618,29 @@ function extractTextFromHTML(html: string): string {
     return undefined
   })
   
+  // If the page has a compact inline recipe block (like Guardian articles),
+  // extract that first to reduce hallucinations.
+  const inlineRecipe = detectInlineRecipe($)
+  if (inlineRecipe && inlineRecipe.ingredients.length >= 4) {
+    const ingredientsText = inlineRecipe.ingredients.map((item) => `- ${item}`).join('\n')
+    const instructionsText =
+      inlineRecipe.instructions.length > 0
+        ? inlineRecipe.instructions.map((step, idx) => `${idx + 1}. ${step}`).join('\n')
+        : ''
+
+    let text = `=== Ingredients ===\n${ingredientsText}\n`
+    if (instructionsText) {
+      text += `\n=== Instructions ===\n${instructionsText}\n`
+    }
+
+    if (metadataText) {
+      text = `${metadataText}${text}`
+    }
+
+    return text.trim()
+  }
+  
   // Build metadata text from JSON-LD if found
-  let metadataText = ''
   if (recipeMetadata) {
     const metadata = recipeMetadata as JsonLdRecipe
     const metadataParts: string[] = []
@@ -765,6 +904,12 @@ async function extractRecipeWithAI(content: string, contentType: 'html' | 'text'
    - If instructions are present (even if messy or poorly formatted), ONLY clean, reformat, and restructure them.
    - NEVER remove steps, reorder steps, change quantities mentioned, or alter the content.
    - Preserve the exact meaning and sequence of what the user provided.
+
+1b. **NEVER change existing ingredients or quantities.**
+   - Do not add, remove, or substitute ingredients.
+   - Do not convert units or scale quantities—preserve the exact numbers/units/words provided.
+   - Only clean formatting (trim whitespace, normalize bullets/headings) while keeping the original ingredient text intact and in the same order.
+   - If the source is ambiguous, keep the ingredient text as-is rather than guessing or inventing.
 
 2. **Generate instructions ONLY if they are completely missing or extremely minimal.**
    - If instructions are missing or very incomplete (e.g., just "bake at 350" with no other steps), generate detailed, comprehensive instructions based on the ingredients and recipe title.
@@ -1278,7 +1423,8 @@ export async function POST(req: Request) {
     
     // Prepare recipe data for Supabase (store structured sections to keep headers)
     const ingredients = await normalizeIngredientSections(
-      extractedRecipe.ingredientSections
+      extractedRecipe.ingredientSections,
+      { enableAiConversions: false, skipConversions: true }
     )
     const instructions = normalizeInstructionSections(extractedRecipe.instructionSections)
     const metadataNotes = formatMetadataForNotes(extractedRecipe)
@@ -1339,6 +1485,23 @@ export async function POST(req: Request) {
       carbs_grams: extractedRecipe.nutrition?.carbs || null,
     }
 
+    // AI expectedMatches for highlighting
+    if (process.env.OPENAI_API_KEY) {
+      const aiMatches = await generateExpectedMatchesAI(ingredients, instructions)
+      if (aiMatches) {
+        recipeData.expected_matches = aiMatches
+        console.log(
+          `[import/ai] expected_matches generated for ${extractedRecipe.title || 'untitled'} (${
+            Object.keys(aiMatches).length
+          } steps)`,
+        )
+      } else {
+        console.warn('[import/ai] expected_matches empty/null')
+      }
+    } else {
+      console.warn('[import/ai] Skipping expected_matches: OPENAI_API_KEY missing')
+    }
+
     // Insert into Supabase
     const supabase = createServerClient()
     
@@ -1346,7 +1509,7 @@ export async function POST(req: Request) {
     let data, error
     if (userId && typeof userId === 'string') {
       // Try with created_by
-      const result = await supabase
+      let result = await supabase
         .from('recipes')
         .insert({ ...recipeData, created_by: userId })
         .select()
@@ -1355,11 +1518,19 @@ export async function POST(req: Request) {
       data = result.data
       error = result.error
       
-      // If error is about missing column, retry without created_by
-      if (error && (error.message.includes('created_by') || error.message.includes('column') || error.code === '42703')) {
+      // If error is about missing column, retry without created_by or expected_matches
+      if (
+        error &&
+        (error.message.includes('created_by') ||
+          error.message.includes('expected_matches') ||
+          error.message.includes('column') ||
+          error.code === '42703')
+      ) {
+        const fallbackData = { ...recipeData }
+        delete (fallbackData as any).expected_matches
         const retryResult = await supabase
           .from('recipes')
-          .insert(recipeData)
+          .insert(fallbackData)
           .select()
           .single()
         
@@ -1368,7 +1539,7 @@ export async function POST(req: Request) {
       }
     } else {
       // No userId, insert without created_by
-      const result = await supabase
+      let result = await supabase
         .from('recipes')
         .insert(recipeData)
         .select()
@@ -1376,6 +1547,22 @@ export async function POST(req: Request) {
       
       data = result.data
       error = result.error
+
+      if (
+        error &&
+        (error.message.includes('expected_matches') || error.message.includes('column') || error.code === '42703')
+      ) {
+        const fallbackData = { ...recipeData }
+        delete (fallbackData as any).expected_matches
+        result = await supabase
+          .from('recipes')
+          .insert(fallbackData)
+          .select()
+          .single()
+        
+        data = result.data
+        error = result.error
+      }
     }
 
     if (error) {
@@ -1485,4 +1672,3 @@ export async function POST(req: Request) {
     )
   }
 }
-

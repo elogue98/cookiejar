@@ -123,7 +123,7 @@ const estimateServingsFromTitle = (title?: string | null): number => {
 }
 
 const defaultNutritionForServings = (servings: number): NutritionInfo => {
-  const servingsSafe = Math.max(servings, 1)
+  Math.max(servings, 1) // ensure positive in case we later scale nutrition
   return {
     calories: DEFAULT_NUTRITION.calories,
     protein: DEFAULT_NUTRITION.protein,
@@ -292,4 +292,3 @@ export async function ensureMetadataCompleteness<T extends MetadataAwareRecipe>(
 
   return enriched as T
 }
-

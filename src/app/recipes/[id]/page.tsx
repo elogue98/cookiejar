@@ -12,11 +12,12 @@ import RecipeComments from '@/app/components/RecipeComments'
 import RecipeHistory from '@/app/components/RecipeHistory'
 import RecipeInteractionWrapper from '@/app/components/RecipeInteractionWrapper'
 import ImportCompletionOverlay from '@/app/components/ImportCompletionOverlay'
+import type { IngredientGroup, InstructionGroup, Recipe } from '@/types/recipe'
 
 // Helper functions
 function getDomain(url: string): string {
   try {
-    let domain = new URL(url).hostname.replace(/^www\./, '')
+    const domain = new URL(url).hostname.replace(/^www\./, '')
     // Remove standard TLDs (last segment if it matches common patterns)
     // We split by dot
     const parts = domain.split('.')
@@ -37,7 +38,7 @@ function getDomain(url: string): string {
        return parts.join('.')
     }
     return domain
-  } catch (e) {
+  } catch {
     return 'Original Link'
   }
 }
@@ -78,6 +79,15 @@ function formatTime(time: string): string {
   return time.replace(/\s*minutes?\s*/gi, ' min').trim()
 }
 
+function cleanNullableText(value?: string | null): string | undefined {
+  if (!value) return undefined
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  const normalized = trimmed.toLowerCase()
+  if (normalized === 'null' || normalized === 'undefined' || normalized === 'n/a') return undefined
+  return trimmed
+}
+
 function isSectionHeader(text: string): boolean {
   const t = text.trim()
   if (!t) return false
@@ -95,9 +105,9 @@ function isSectionHeader(text: string): boolean {
   return false
 }
 
-function organizeIntoGroups(items: string[], isInstructions: boolean = false): { section: string; items: string[] }[] {
-  const groups: { section: string; items: string[] }[] = []
-  let currentGroup: { section: string; items: string[] } = { section: '', items: [] }
+function organizeIntoGroups(items: string[], isInstructions: boolean = false): IngredientGroup[] {
+  const groups: IngredientGroup[] = []
+  let currentGroup: IngredientGroup = { section: '', items: [] }
 
   for (const item of items) {
     const cleaned = item.trim()
@@ -126,47 +136,15 @@ function organizeIntoGroups(items: string[], isInstructions: boolean = false): {
   return groups.length > 0 ? groups : [{ section: '', items: [] }]
 }
 
-interface Recipe {
-  id: string
-  title: string
-  ingredients: { section: string; items: string[] }[] | null
-  instructions: { section: string; steps: string[] }[] | null
-  tags: string[] | null
-  rating: number | null
-  notes: string | null
-  created_at: string | null
-  image_url: string | null
-  source_url: string | null
-  cookbookSource: string | null
-  created_by?: string | null
-  creator?: {
-    id: string
-    name: string
-    avatar_url: string
-  } | null
-  // Metadata fields
-  servings?: number | null
-  prep_time?: string | null
-  cook_time?: string | null
-  total_time?: string | null
-  cuisine?: string | null
-  meal_type?: string | null
-  // Nutrition (per serving)
-  calories?: number | null
-  protein_grams?: number | null
-  fat_grams?: number | null
-  carbs_grams?: number | null
-}
-
 type RecipeRow = Recipe & {
   cookbooksource?: string | null
   created_by?: string | null
 }
 
-const isIngredientGroupArray = (items: unknown[]): items is { section: string; items: string[] }[] =>
+const isIngredientGroupArray = (items: unknown[]): items is IngredientGroup[] =>
   items.length > 0 && typeof items[0] === 'object' && items[0] !== null && 'section' in items[0]
 
-const isInstructionGroupArray = (items: unknown[]): items is { section: string; steps: string[] }[] =>
+const isInstructionGroupArray = (items: unknown[]): items is InstructionGroup[] =>
   items.length > 0 && typeof items[0] === 'object' && items[0] !== null && 'section' in items[0]
 
 type SearchParamsRecord = Record<string, string | string[] | undefined>
@@ -212,49 +190,20 @@ export default async function RecipeDetail({ params, searchParams }: PageProps) 
     }
   }
 
-  let averageRating: number | null = null
-  let ratingEntries: { user: string; rating: number; avatar_url: string; user_id: string }[] | null = null
+  let averageRating: number | null = recipe.rating
   
   try {
     const { data: ratings, error: ratingsError } = await supabase
       .from('ratings')
-      .select('rating, user_id')
+      .select('rating')
       .eq('recipe_id', id)
 
-    if (ratingsError) {
-       averageRating = recipe.rating
-       ratingEntries = null
-    } else if (ratings && ratings.length > 0) {
+    if (!ratingsError && ratings && ratings.length > 0) {
       const sum = ratings.reduce((acc, r) => acc + r.rating, 0)
       averageRating = Math.round((sum / ratings.length) * 10) / 10
-      
-      const userIds = [...new Set(ratings.map(r => r.user_id))]
-      const { data: users, error: usersError } = await supabase
-        .from('users')
-        .select('id, name, avatar_url')
-        .in('id', userIds)
-      
-      const usersMap = new Map<string, { name: string; avatar_url: string }>()
-      if (users && !usersError) {
-        users.forEach(u => usersMap.set(u.id, { name: u.name, avatar_url: u.avatar_url }))
-      }
-      
-      ratingEntries = ratings.map(r => {
-        const userData = usersMap.get(r.user_id)
-        return {
-          user: userData?.name || 'Unknown',
-          rating: r.rating,
-          avatar_url: userData?.avatar_url || '',
-          user_id: r.user_id
-        }
-      })
-    } else {
-      averageRating = null
-      ratingEntries = []
     }
-  } catch (error) {
+  } catch {
     averageRating = recipe.rating
-    ratingEntries = null
   }
 
   let normalizedIngredients: { section: string; items: string[] }[] | null = null
@@ -346,10 +295,11 @@ export default async function RecipeDetail({ params, searchParams }: PageProps) 
     ...recipe,
     ingredients: normalizedIngredients || [],
     instructions: normalizedInstructions || [],
-    cookbookSource: recipe.cookbooksource || recipe.cookbookSource || null,
-    created_by: recipe.created_by || null,
-    creator: creator
-  }
+  cookbookSource: recipe.cookbooksource || recipe.cookbookSource || null,
+  created_by: recipe.created_by || null,
+  creator: creator,
+  expected_matches: recipe.expected_matches || null,
+}
 
   // Build metadata from database columns first, fallback to JSON parsing
   let metadata: {
@@ -374,13 +324,13 @@ export default async function RecipeDetail({ params, searchParams }: PageProps) 
 
   if (hasMetadata) {
     metadata = {
-      description: recipe.notes || undefined,
+      description: cleanNullableText(recipe.notes),
       servings: recipe.servings || undefined,
-      prepTime: recipe.prep_time || undefined,
-      cookTime: recipe.cook_time || undefined,
-      totalTime: recipe.total_time || undefined,
-      cuisine: recipe.cuisine || undefined,
-      mealType: recipe.meal_type || undefined,
+      prepTime: cleanNullableText(recipe.prep_time),
+      cookTime: cleanNullableText(recipe.cook_time),
+      totalTime: cleanNullableText(recipe.total_time),
+      cuisine: cleanNullableText(recipe.cuisine),
+      mealType: cleanNullableText(recipe.meal_type),
     }
     
     // Add nutrition if available
@@ -399,13 +349,34 @@ export default async function RecipeDetail({ params, searchParams }: PageProps) 
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         metadata = parsed
       }
-    } catch (e) {
+    } catch {
       // Not JSON, treat notes as description
       metadata = {
-        description: recipeData.notes
+        description: cleanNullableText(recipeData.notes)
       }
     }
   }
+
+  if (metadata) {
+    metadata = {
+      ...metadata,
+      description: cleanNullableText(metadata.description),
+      prepTime: cleanNullableText(metadata.prepTime),
+      cookTime: cleanNullableText(metadata.cookTime),
+      totalTime: cleanNullableText(metadata.totalTime),
+      cuisine: cleanNullableText(metadata.cuisine),
+      mealType: cleanNullableText(metadata.mealType),
+    }
+  }
+
+  const cuisine = metadata?.cuisine?.trim()
+  const mealType = metadata?.mealType?.trim()
+  const showMealType = Boolean(
+    mealType && (!cuisine || mealType.toLowerCase() !== cuisine.toLowerCase())
+  )
+  const displayTags = recipeData.tags
+    ? Array.from(new Set(recipeData.tags.map((tag) => tag.trim()).filter(Boolean)))
+    : []
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
@@ -428,6 +399,7 @@ export default async function RecipeDetail({ params, searchParams }: PageProps) 
       <RecipeInteractionWrapper 
         ingredients={recipeData.ingredients || []} 
         instructions={recipeData.instructions || []}
+        expectedMatches={recipeData.expected_matches || undefined}
       >
         {{
           sidebarTop: (
@@ -454,8 +426,8 @@ export default async function RecipeDetail({ params, searchParams }: PageProps) 
              {/* Title & Meta */}
              <div>
                <div className="flex items-center gap-2 mb-2 text-xs font-bold tracking-wider text-slate-400 uppercase">
-                  {metadata?.cuisine && <span>{metadata.cuisine}</span>}
-                  {metadata?.mealType && <span>• {metadata.mealType}</span>}
+                  {cuisine && <span>{cuisine}</span>}
+                  {showMealType && <span>• {mealType}</span>}
                </div>
                <h1 className="text-3xl md:text-4xl font-serif font-medium text-slate-900 mb-4 leading-tight">{recipeData.title}</h1>
                
@@ -588,9 +560,9 @@ export default async function RecipeDetail({ params, searchParams }: PageProps) 
              {/* Actions Footer */}
              <div className="py-8 border-t border-slate-200 flex flex-col gap-8">
                 {/* Tags */}
-                {recipeData.tags && recipeData.tags.length > 0 && (
+                {displayTags.length > 0 && (
                   <div className="flex flex-wrap gap-2">
-                    {recipeData.tags.map(tag => (
+                    {displayTags.map(tag => (
                       <span key={tag} className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-sm hover:bg-slate-200 cursor-default">
                         #{tag}
                       </span>

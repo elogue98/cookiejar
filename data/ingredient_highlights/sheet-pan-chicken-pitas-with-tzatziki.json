@@ -1,0 +1,34 @@
+{
+  "id": "sheet-pan-chicken-pitas-with-tzatziki",
+  "title": "Sheet Pan Chicken Pitas with Tzatziki",
+  "sourceUrl": "https://pinchofyum.com/sheet-pan-chicken-pitas",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "1 diced cucumber",
+        "1/2 diced red onion",
+        "1/2 cup kalamata olives",
+        "1/2 cup feta cheese",
+        "6 pieces of some kind of flatbread (pita, naan, socca)"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Preheat the oven to 425 degrees. Mix chicken ingredients in a bowl. Marinate for 30 minutes.",
+        "Mix all tzatziki ingredients.",
+        "On a sheet pan, toss the peppers with olive oil and salt. On a second sheet pan, place the chicken pieces. Roast both for 10-15 minutes, until chicken is cooked and peppers are browned.",
+        "Serve chicken, peppers, sauce, and all the other fixings on a big platter (or just a sheet pan, really) and everyone can build their own pitas / bowls / salads. So much salty-briney-crunchy goodness."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [],
+    "step-1": [],
+    "step-2": [],
+    "step-3": []
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "id": "firecracker-vegan-lettuce-wraps",
+  "title": "Firecracker Vegan Lettuce Wraps",
+  "sourceUrl": "https://pinchofyum.com/vegan-lettuce-wraps",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "1 block extra firm tofu (see notes)",
+        "4 ounces brown rice noodles",
+        "1 head butter lettuce for wrapping",
+        "1/2 cup peanuts for serving",
+        "1/2 cup cilantro for serving",
+        "1 lime for serving"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "NOODLE PREP:",
+        "Soak your noodles in a bowl of lukewarm water for at least 30 minutes while prepping the rest of the recipe. You want the noodles to be soft and flexible.",
+        "SAUCE:",
+        "Blend all the sauce ingredients together in a small blender or food processor until smooth and creamy.",
+        "TOFU:",
+        "Press the tofu with a few paper towels to get some of the moisture out. Cut the tofu into small pieces. Heat a little oil in a nonstick skillet. Add your tofu. Stir-fry until golden brown. I usually let it sauté for at least 15 minutes. Add about half of the sauce to the pan. Stir-fry for another 3-5 minutes. As the sauce browns, it will form small crispy pieces around the tofu. Yum! Transfer tofu to a bowl.",
+        "NOODLES:",
+        "Drain and rinse your noodles. Add another swish of oil to the pan and plop the noodles in. Add about half of the remaining sauce. Stir fry for just a minute or two until coated. Add a splash of water if it’s too sticky. Remove from heat immediately and toss with the tofu.",
+        "LETTUCE WRAP IT UP:",
+        "Fill your butter lettuce leaves with the noodle/tofu mixture (it’s okay if it’s sticky – you’re just wrapping it up in lettuce). Top with peanuts, cilantro, lime, and more sauce. YUM YUM YUM!"
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-1"
+    ],
+    "step-1": [],
+    "step-2": [
+      "0-0",
+      "0-1"
+    ],
+    "step-3": [
+      "0-0",
+      "0-1"
+    ],
+    "step-4": [
+      "0-2",
+      "0-1",
+      "0-0",
+      "0-3",
+      "0-4",
+      "0-5"
+    ]
+  }
+}

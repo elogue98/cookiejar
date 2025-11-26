@@ -1,0 +1,76 @@
+{
+  "id": "dal-tadka",
+  "title": "Dal Tadka",
+  "sourceUrl": "https://www.sanjeevkapoor.com/recipe/Dal-Tadka.html",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "INGREDIENTS LIST FOR DAL TADKA:",
+        "1/2 cup Split pigeon pea (toor dal/arhar dal) soaked, drained and boiled with enough water and turmeric powder",
+        "1/2 cup Split Bengal gram (chana dal) soaked, drained and boiled with enough water and turmeric powder",
+        "2 tablespoons Ghee",
+        "1 teaspoon Cumin seeds",
+        "a pinch Asafoetida",
+        "1 inch Garlic cloves chopped",
+        "1 inch piece Ginger chopped",
+        "2 medium Onions chopped",
+        "to taste Salt",
+        "2 medium Tomatoes chopped",
+        "1 teaspoon Red chilli powder",
+        "1/4 teaspoon Turmeric powder",
+        "1/4 teaspoon Cumin powder",
+        "1/2 teaspoon Coriander powder",
+        "1/2 teaspoon Garam masala powder",
+        "Juice of 1 lemon",
+        "1 tablespoon Fresh coriander leaves chopped"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "METHOD:",
+        "Heat ghee in a non-stick pan and add cumin seeds. Once they change colour, add asafetida and mix.",
+        "Add garlic and ginger and sauté on medium heat for a minute. Add onions and a pinch of salt and sauté till the onions turn golden brown.",
+        "Add tomatoes and sauté till they turn pulpy.",
+        "Add red chilli powder, turmeric powder, cumin powder, coriander powder andgaram masala powder and mix well. Cook for a minute and add the cooked grams and salt. Mix well.",
+        "Add water if required and bring to a boil.",
+        "Add lemon juice and remove from heat.",
+        "Transfer into a serving bowl, garnish with corianderleaves and serve hot."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [],
+    "step-1": [
+      "0-5",
+      "0-3",
+      "0-4"
+    ],
+    "step-2": [
+      "0-6",
+      "0-7",
+      "0-8",
+      "0-9"
+    ],
+    "step-3": [
+      "0-10"
+    ],
+    "step-4": [
+      "0-11",
+      "0-12",
+      "0-13",
+      "0-14",
+      "0-15"
+    ],
+    "step-5": [],
+    "step-6": [
+      "0-16"
+    ],
+    "step-7": [
+      "0-17"
+    ]
+  }
+}

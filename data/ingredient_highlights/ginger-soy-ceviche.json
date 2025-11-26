@@ -1,0 +1,79 @@
+{
+  "id": "ginger-soy-ceviche",
+  "title": "Ginger-soy ceviche",
+  "sourceUrl": "https://www.jamieoliver.com/recipes/fish/ginger-soy-ceviche/",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "1 thumb-sized piece of fresh ginger, grated",
+        "1 garlic clove, grated",
+        "juice of 3 limes, plus zest of 1",
+        "2 tbsp light soy sauce",
+        "1 tbsp yuzu juice (optional)",
+        "pinch of salt",
+        "few cracks of black pepper",
+        "300g cooked peeled king prawns, quartered",
+        "½ cucumber, diced",
+        "1 pepper (any colour), diced",
+        "200g cherry tomatoes, diced",
+        "½ red onion, diced",
+        "1 jalapeño, diced",
+        "large bunch of coriander, thinly sliced",
+        "1 bag of salted tortilla chips, to serve",
+        "For the chilli oil",
+        "1 tbsp chilli flakes",
+        "1 tsp paprika",
+        "½ tsp cumin seeds",
+        "2 tbsp vegetable oil"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Put the ginger, garlic, lime zest and juice, soy sauce, yuzu juice (if using), salt and black pepper into a bowl and stir to combine. Add the prawns and give it a mix again.",
+        "Next, make the chilli oil. Combine the chilli flakes, paprika and cumin seeds in a small bowl. Heat the oil in a small saucepan over a high heat until slightly smoking, then carefully pour the hot oil over the spices. Stir well to combine.",
+        "Add the cucumber, pepper, tomatoes, onion, jalapeño and coriander to the bowl with the prawns. Add the chilli oil and mix thoroughly until everything is combined.",
+        "Transfer to a shallow bowl and serve with your favourite tortilla chips."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-1",
+      "0-4",
+      "0-3",
+      "0-9",
+      "0-2",
+      "0-6",
+      "0-5",
+      "0-7",
+      "0-0"
+    ],
+    "step-1": [
+      "0-15",
+      "0-16",
+      "0-17",
+      "0-18",
+      "0-19"
+    ],
+    "step-2": [
+      "0-8",
+      "0-12",
+      "0-15",
+      "0-9",
+      "0-10",
+      "0-11",
+      "0-13",
+      "0-19",
+      "0-7",
+      "0-16",
+      "0-6"
+    ],
+    "step-3": [
+      "0-14"
+    ]
+  }
+}

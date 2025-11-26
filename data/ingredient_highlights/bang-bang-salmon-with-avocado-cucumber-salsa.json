@@ -1,0 +1,60 @@
+{
+  "id": "bang-bang-salmon-with-avocado-cucumber-salsa",
+  "title": "Bang Bang Salmon with Avocado Cucumber Salsa",
+  "sourceUrl": "https://pinchofyum.com/bang-bang-salmon-with-avocado-cucumber-salsa",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "1 1/2 pounds salmon filet",
+        "1–2 tablespoons all-purpose seasoning mix (this is the one I use – see notes for homemade)",
+        "1/4 cup mayo",
+        "2 tablespoons sweet chili sauce",
+        "1 clove garlic, grated",
+        "1 teaspoon soy sauce",
+        "chili crisp for topping"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "PREP THE SALMON:",
+        "Preheat oven to 400 degrees. Cut the salmon into individual portions if you want. Pat the salmon dry. Coat the salmon with the spice mix. Place salmon on a parchment-lined baking sheet.",
+        "MAKE THE BANG BANG SAUCE:",
+        "Mix mayo, sweet chili sauce, garlic, and soy sauce in a small bowl. Set half of it aside for after baking.",
+        "BAKE THE SALMON:",
+        "Spread a small spoonful of sauce over the seasoned salmon pieces. Bake for 10 minutes towards the top of the oven. Then turn the broiler on for another 2-3 minutes, until your salmon looks golden brown and a bit caramelized on top.",
+        "SERVE:",
+        "Serve the salmon over rice, with a vegetable of choice, and the reserved bang bang sauce + chili crisp drizzled over top! So easy and so good."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-0"
+    ],
+    "step-1": [
+      "0-1",
+      "0-0"
+    ],
+    "step-2": [],
+    "step-3": [
+      "0-3",
+      "0-5",
+      "0-2",
+      "0-4"
+    ],
+    "step-4": [
+      "0-0"
+    ],
+    "step-5": [
+      "0-0"
+    ],
+    "step-7": [
+      "0-0",
+      "0-6"
+    ]
+  }
+}

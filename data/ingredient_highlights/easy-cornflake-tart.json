@@ -1,0 +1,51 @@
+{
+  "id": "easy-cornflake-tart",
+  "title": "Easy cornflake tart",
+  "sourceUrl": "https://www.bbcgoodfood.com/recipes/easy-cornflake-tart",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "320g ready-rolled shortcrust pastry",
+        "plain flour to dust",
+        "50g butter",
+        "125g golden syrup",
+        "25g light brown soft sugar",
+        "100g cornflakes",
+        "125g strawberry or raspberry jam",
+        "custard to serve"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Heat the oven to 180C/160C fan/gas 4. Unroll the pastry and briefly roll out on a lightly floured work surface until it's large enough to fit a 23cm loose-bottomed tart tin. Use the rolling  to lift the pastry over the tin, then press into the corners and sides so the excess pastry hangs over the rim. Trim this away, leaving just a small amount of excess hanging over the rim.",
+        "Line the pastry with baking parchment and fill with baking beans or uncooked rice. Bake for 15 mins. Remove the parchment and beans, then bake for another 5-10 mins until just golden. Remove from the oven and trim any excess pastry from the edges using a serrated knife.",
+        "Heat the butter, syrup and sugar in a small pan with a pinch of salt, stirring frequently, until melted and smooth. Fold in the cornflakes to coat in the butter mixture.",
+        "Spoon the jam into the cooked pastry base, then level the surface. Tip the cornflake mixture over the jam and gently press down until all of the jam is covered with a layer of the mixture. Return the tart to the oven and bake for another 5 mins until the cornflakes are golden and toasted. Leave to cool until just warm before slicing and serving with custard."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-1",
+      "0-0"
+    ],
+    "step-1": [
+      "0-0"
+    ],
+    "step-2": [
+      "0-2",
+      "0-5",
+      "0-3",
+      "0-4"
+    ],
+    "step-3": [
+      "0-6",
+      "0-7",
+      "0-5"
+    ]
+  }
+}

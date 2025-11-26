@@ -151,7 +151,7 @@ export default function ImportPage() {
           }}>
             <p className="text-sm leading-relaxed" style={{ color: 'var(--text-main)' }}>
               <strong>How it works:</strong> Paste a recipe URL from any cooking website. 
-              We'll automatically extract the recipe title, ingredients, instructions, nutrition info, and auto-generate tags. 
+              We&apos;ll automatically extract the recipe title, ingredients, instructions, nutrition info, and auto-generate tags. 
               The AI-powered importer works with any site and intelligently structures everything perfectly.
             </p>
           </div>
@@ -160,4 +160,3 @@ export default function ImportPage() {
     </div>
   )
 }
-

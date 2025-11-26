@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/lib/userContext'
@@ -50,9 +51,12 @@ export default function ProfilePage() {
                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               }}
             >
-              <img
+              <Image
                 src={user.avatar_url}
                 alt={user.name}
+                width={128}
+                height={128}
+                sizes="128px"
                 className="w-full h-full object-cover"
               />
             </div>
@@ -70,4 +74,3 @@ export default function ProfilePage() {
     </div>
   )
 }
-

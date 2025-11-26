@@ -1,0 +1,86 @@
+{
+  "id": "moroccan-chickpea-squash-cavolo-nero-stew",
+  "title": "Moroccan chickpea, squash & cavolo nero stew",
+  "sourceUrl": "https://www.bbcgoodfood.com/recipes/moroccan-chickpea-squash-kale-stew",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "4 tomatoes halved",
+        "5 tbsp olive oil",
+        "250g butternut squash peeled and chopped into large chunks",
+        "1 tbsp thyme leaves",
+        "1 garlic clove crushed",
+        "1 onion sliced",
+        "2 x 400g cans chickpeas drained",
+        "1 bay leaf",
+        "1 tbsp ground cumin",
+        "1 tsp ground cinnamon",
+        "½ tsp turmeric",
+        "1 tbsp harissa",
+        "1l vegetable stock",
+        "100g feta crumbled",
+        "1 lemon zested, then cut into wedges",
+        "2 tsp fennel seeds",
+        "1 tsp ground coriander",
+        "200g cavolo nero shredded",
+        "handful fresh coriander leaves, to serve"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Heat oven to 200C/180C fan/gas 6. Put the tomatoes on a baking sheet lined with baking parchment, drizzle over 2 tbsp olive oil, season and roast in the oven for 20 mins or until soft. Set aside.",
+        "Meanwhile, pour 2 tbsp oil into a large saucepan and add the squash, thyme, garlic and onion. Season generously and cook on a low heat for 15 mins or until the vegetables begin to soften (but not brown).",
+        "Add the tomatoes, chickpeas, bay, ground spices and harissa. Season to taste and pour in the stock. Bring to the boil, then reduce the heat and simmer for 30-35 mins until the liquid has reduced.",
+        "Put the feta in a small bowl and add the remaining olive oil and the lemon zest. Mix well and set aside.",
+        "Toast the fennel seeds in a frying pan for 1 min, then lightly crush with a pestle and mortar, or in a bowl with the back of a rolling .",
+        "Add the ground coriander and cavolo nero to the stew and cook for 2 mins. Put the stew in a bowl and top with a scoop of feta, a sprinkling of coriander leaves and fennel seeds, and some seasoning. Serve with lemon wedges on the side."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-0",
+      "0-1",
+      "0-14"
+    ],
+    "step-1": [
+      "0-1",
+      "0-3",
+      "0-4",
+      "0-5",
+      "0-2",
+      "0-12",
+      "0-14"
+    ],
+    "step-2": [
+      "0-0",
+      "0-11",
+      "0-6",
+      "0-12",
+      "0-7",
+      "0-14"
+    ],
+    "step-3": [
+      "0-1",
+      "0-14",
+      "0-13"
+    ],
+    "step-4": [
+      "0-15",
+      "0-14"
+    ],
+    "step-5": [
+      "0-15",
+      "0-16",
+      "0-18",
+      "0-17",
+      "0-14",
+      "0-7",
+      "0-13"
+    ]
+  }
+}

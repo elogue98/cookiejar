@@ -1,0 +1,40 @@
+{
+  "id": "pan-seared-scallops",
+  "title": "Pan-Seared Scallops with Bacon Mash",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "400g Maris Piper potatoes, peeled",
+        "sea salt and freshly ground black pepper",
+        "60g piece of thick smoked bacon",
+        "6 scallops, shelled and trimmed",
+        "2 knobs of unsalted butter",
+        "75ml semi-skimmed milk",
+        "olive oil",
+        "a few sprigs of fresh sage",
+        "1/2 a lemon"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Juicy pan-seared scallops and salty, crisp bacon – this recipe is the perfect surf and turf marriage.",
+        "Quarter the potatoes, halving any smaller ones, then place in a large pan and cover with cold salted water. Place over a high heat and bring to the boil, then cook for 15 to 20 minutes, or until tender.",
+        "Meanwhile, using a sharp knife, roughly chop the bacon into chunky lardons, roughly 1/2cm thick. Score the scallops in a criss-cross fashion about 1cm deep on one side, season with a pinch of salt, then set aside.",
+        "Drain and allow the potatoes to steam dry, then return to the empty pan with the milk, a knob of butter and a pinch of salt and pepper. Mash until smooth, then cover until needed.",
+        "Heat a splash of olive oil in a large non-stick frying pan over a medium heat, then add the bacon and fry for around 2 minutes, or until golden. Move the bacon to one side of the pan, then pick the sage leaves into the space. Cook for 1 minute, or until crisp, then move to the side of the pan along with the bacon. Add the remaining butter and the scallops, cut-side down, to the empty space. Cook for around 2 minutes, or until golden, turning halfway, then squeeze over the lemon."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": ["0-2", "0-3"],
+    "step-1": ["0-0", "0-1"],
+    "step-2": ["0-2", "0-3", "0-1"],
+    "step-3": ["0-0", "0-4", "0-5", "0-1"],
+    "step-4": ["0-2", "0-6", "0-7", "0-4", "0-3", "0-8"]
+  }
+}
+

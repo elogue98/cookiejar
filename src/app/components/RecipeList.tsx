@@ -2,7 +2,9 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import ImportRecipeModal from './ImportRecipeModal'
+import UserAvatar from './UserAvatar'
 import { useUser } from '@/lib/userContext'
 import type { Recipe } from '@/types/recipe'
 
@@ -311,10 +313,13 @@ export default function RecipeList({ recipes }: RecipeListProps) {
               {/* Image Container */}
               <div className="relative aspect-[4/3] rounded-[20px] overflow-hidden mb-4 bg-[#F9E7B2] shrink-0">
                 {recipe.image_url ? (
-                  <img
+                  <Image
                     src={recipe.image_url}
                     alt={recipe.title}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
+                    sizes="(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                    priority={false}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-4xl">🍪</div>
@@ -344,7 +349,12 @@ export default function RecipeList({ recipes }: RecipeListProps) {
                   <div className="flex items-center gap-2">
                     {recipe.creator ? (
                       <>
-                        <img src={recipe.creator.avatar_url} className="w-6 h-6 rounded-full bg-gray-200 object-cover" alt="" />
+                        <UserAvatar
+                          src={recipe.creator.avatar_url}
+                          alt={recipe.creator.name}
+                          name={recipe.creator.name}
+                          size="small"
+                        />
                         <span className="text-xs font-medium text-gray-500 truncate max-w-[100px]">{recipe.creator.name}</span>
                       </>
                     ) : (

@@ -3,53 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabaseClient'
 import { useUser } from '@/lib/userContext'
 import Navigation from '@/app/components/Navigation'
-
-interface Recipe {
-  id: string
-  title: string
-  ingredients: string[] | null
-  instructions: string | null
-  tags: string[] | null
-  rating: number | null
-  notes: string | null
-  created_at: string | null
-  source_url: string | null
-  cookbookSource: string | null
-  image_url: string | null
-  // Metadata fields
-  servings?: number | null
-  prep_time?: string | null
-  cook_time?: string | null
-  total_time?: string | null
-  cuisine?: string | null
-  meal_type?: string | null
-  // Nutrition (per serving)
-  calories?: number | null
-  protein_grams?: number | null
-  fat_grams?: number | null
-  carbs_grams?: number | null
-}
-
-type NutritionMetadata = {
-  calories?: number
-  protein?: number
-  fat?: number
-  carbs?: number
-}
-
-type RecipeMetadata = {
-  description?: string
-  servings?: number
-  prepTime?: string
-  cookTime?: string
-  totalTime?: string
-  cuisine?: string
-  mealType?: string
-  nutrition?: NutritionMetadata
-}
+import type { IngredientGroup, InstructionGroup } from '@/types/recipe'
 
 export default function StructuredEditPage() {
   const params = useParams()
@@ -57,7 +15,6 @@ export default function StructuredEditPage() {
   const { user } = useUser()
   const id = params.id as string
 
-  const [recipe, setRecipe] = useState<Recipe | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -92,19 +49,19 @@ export default function StructuredEditPage() {
 
         if (error || !data) throw new Error('Recipe not found')
 
-        setRecipe(data)
         setTitle(data.title || '')
         setImageUrl(data.image_url || '')
         
         // Ingredients parsing
         if (data.ingredients && Array.isArray(data.ingredients)) {
           const list: string[] = []
-          // Flatten potential structured ingredients
-          data.ingredients.forEach((item: any) => {
-            if (typeof item === 'string') list.push(item)
-            else if (typeof item === 'object') {
-               if (item.section) list.push(`SECTION: ${item.section}`)
-               if (item.items) list.push(...item.items)
+          data.ingredients.forEach((item) => {
+            if (typeof item === 'string') {
+              list.push(item)
+            } else if (item && typeof item === 'object' && 'items' in item) {
+              const group = item as IngredientGroup
+              if (group.section) list.push(`SECTION: ${group.section}`)
+              if (Array.isArray(group.items)) list.push(...group.items)
             }
           })
           setIngredientList(list)
@@ -112,25 +69,39 @@ export default function StructuredEditPage() {
 
         // Instructions parsing
         if (data.instructions) {
-           // Simple split by newline for now, handling the JSON case via basic check
-           let text = data.instructions
-           try {
-             if (text.startsWith('[') || text.startsWith('{')) {
-                const parsed = JSON.parse(text)
-                if (Array.isArray(parsed)) {
-                   const steps: string[] = []
-                   parsed.forEach((group: any) => {
-                      if (group.section) steps.push(`SECTION: ${group.section}`)
-                      if (group.steps) steps.push(...group.steps)
-                   })
-                   setInstructionList(steps)
+          if (Array.isArray(data.instructions)) {
+            const steps: string[] = []
+            data.instructions.forEach((group) => {
+              const typedGroup = group as InstructionGroup
+              if (typedGroup.section) steps.push(`SECTION: ${typedGroup.section}`)
+              if (Array.isArray(typedGroup.steps)) steps.push(...typedGroup.steps)
+            })
+            setInstructionList(steps)
+          } else {
+            const text = data.instructions
+            if (typeof text === 'string') {
+              try {
+                if (text.startsWith('[') || text.startsWith('{')) {
+                  const parsed = JSON.parse(text)
+                  if (Array.isArray(parsed)) {
+                    const steps: string[] = []
+                    parsed.forEach((group) => {
+                      if (group && typeof group === 'object' && 'steps' in group) {
+                        const typed = group as InstructionGroup
+                        if (typed.section) steps.push(`SECTION: ${typed.section}`)
+                        if (Array.isArray(typed.steps)) steps.push(...typed.steps)
+                      }
+                    })
+                    setInstructionList(steps)
+                    return
+                  }
                 }
-             } else {
                 setInstructionList(text.split('\n').filter((line: string) => line.trim()))
-             }
-           } catch {
-              setInstructionList(text.split('\n').filter((line: string) => line.trim()))
-           }
+              } catch {
+                setInstructionList(text.split('\n').filter((line: string) => line.trim()))
+              }
+            }
+          }
         }
 
         setTags(data.tags?.join(', ') || '')
@@ -158,13 +129,13 @@ export default function StructuredEditPage() {
               if (parsed.cuisine) setCuisine(parsed.cuisine)
               if (parsed.mealType) setMealType(parsed.mealType)
             }
-          } catch (e) {
+          } catch {
              // Ignore - not JSON
           }
         }
         
         setLoading(false)
-      } catch (err) {
+      } catch {
         setLoading(false)
       }
     }
@@ -370,7 +341,7 @@ export default function StructuredEditPage() {
 
       if (!res.ok) throw new Error('Failed')
       router.push(`/recipes/${id}`)
-    } catch (err) {
+    } catch {
       setSaving(false)
     }
   }
@@ -442,7 +413,13 @@ export default function StructuredEditPage() {
                       <div className="flex items-center gap-6">
                         <div className="w-32 h-32 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden relative">
                           {imageUrl ? (
-                            <img src={imageUrl} alt="Recipe preview" className="w-full h-full object-cover" />
+                            <Image
+                              src={imageUrl}
+                              alt="Recipe preview"
+                              fill
+                              sizes="128px"
+                              className="object-cover"
+                            />
                           ) : (
                             <span className="text-4xl text-slate-300">📷</span>
                           )}
@@ -572,7 +549,7 @@ export default function StructuredEditPage() {
                   ))}
                   {ingredientList.length === 0 && (
                     <p className="text-center text-slate-400 py-8 border-2 border-dashed border-slate-100 rounded-lg">
-                      No ingredients yet. Click "Add Item" to start.
+                      No ingredients yet. Click &quot;Add Item&quot; to start.
                     </p>
                   )}
                 </div>
@@ -619,7 +596,7 @@ export default function StructuredEditPage() {
                   ))}
                    {instructionList.length === 0 && (
                     <p className="text-center text-slate-400 py-8 border-2 border-dashed border-slate-100 rounded-lg">
-                      No instructions yet. Click "Add Step" to start.
+                      No instructions yet. Click &quot;Add Step&quot; to start.
                     </p>
                   )}
                 </div>

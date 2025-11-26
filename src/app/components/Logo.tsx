@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import NextImage from 'next/image'
 
 interface LogoProps {
   size?: number
@@ -25,7 +26,7 @@ export default function Logo({ size = 48, className = '' }: LogoProps) {
   // Preload all frames
   useEffect(() => {
     frames.forEach((frame) => {
-      const img = new Image()
+      const img = new window.Image()
       img.src = frame
     })
   }, [])
@@ -33,10 +34,6 @@ export default function Logo({ size = 48, className = '' }: LogoProps) {
   // Handle animation on hover
   useEffect(() => {
     if (isHovering) {
-      // Start from frame 1 (index 0), then cycle through all frames
-      frameIndexRef.current = 0
-      setCurrentFrame(0) // Ensure we start at frame 1
-      
       // Start animation: 1→2→3→4→5→6→1
       intervalRef.current = setInterval(() => {
         frameIndexRef.current = (frameIndexRef.current + 1) % frames.length
@@ -49,7 +46,6 @@ export default function Logo({ size = 48, className = '' }: LogoProps) {
         intervalRef.current = null
       }
       frameIndexRef.current = 0
-      setCurrentFrame(0)
     }
 
     return () => {
@@ -60,14 +56,23 @@ export default function Logo({ size = 48, className = '' }: LogoProps) {
   }, [isHovering])
 
   return (
-    <img
+    <NextImage
       src={frames[currentFrame]}
       alt="Cookie Jar Logo"
       width={size}
       height={size}
       className={`inline-block ${className}`}
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
+      onMouseEnter={() => {
+        frameIndexRef.current = 0
+        setCurrentFrame(0)
+        setIsHovering(true)
+      }}
+      onMouseLeave={() => {
+        setIsHovering(false)
+        frameIndexRef.current = 0
+        setCurrentFrame(0)
+      }}
+      priority={size >= 80}
       style={{
         display: 'block',
         transition: 'none', // No CSS transitions, we want instant frame changes
@@ -75,4 +80,3 @@ export default function Logo({ size = 48, className = '' }: LogoProps) {
     />
   )
 }
-

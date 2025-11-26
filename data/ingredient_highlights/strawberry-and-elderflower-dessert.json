@@ -1,0 +1,141 @@
+{
+  "id": "strawberry-and-elderflower-dessert",
+  "title": "Strawberry and elderflower dessert",
+  "sourceUrl": "https://www.greatbritishchefs.com/recipes/strawberry-elderflower-dessert-recipe",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "300g of strawberries, hulled and quartered",
+        "50ml of lemon juice",
+        "50g of sugar",
+        "100ml of water",
+        "2 gelatine leaves",
+        "1 vanilla pod",
+        "40ml of elderflower cordial",
+        "375ml of cream",
+        "110ml of milk",
+        "40g of caster sugar",
+        "180g of egg yolk",
+        "2g of agar agar",
+        "2 silver gelatine leaves",
+        "150g of mascarpone",
+        "1/2 lemon, zest only",
+        "35g of sugar",
+        "10g of freeze-dried strawberries",
+        "10g of freeze-dried raspberries",
+        "10g of freeze-dried yoghurt",
+        "10g of popping candy",
+        "50g of strawberries, hulled and chopped",
+        "5g of sweet cicely"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Place the chopped strawberries into a bowl with the lemon juice, vanilla, sugar and water. Place the bowl over a bain-marie and leave for 20 minutes",
+        "Pass through a fine sieve, but do not push through the mx and allow as much of the clear liquid to drip through as possible. allow to cool and store in the fridge until needed",
+        "To make the \"pillow\", soak 2 leaves of gelatine in cold water until soft. Heat up 200ml of the strawberry juice mixture, once hot melt the gelatine into the liquid. Pour into a mixing bowl and whisk, over ice, until the mixture starts to cool, set and expand. Continue to whisk until soft peaks form",
+        "Pour the mixture into a piping bag and fill the semi-circle moulds. Smooth off the tops then place in the freezer until frozen",
+        "For the elderflower crème, place the cream, milk, elderflower cordial, sugar, egg yolks and agar agar into a thermomix and bring up to 81°C",
+        "Once it reaches 81°C, add the soaked silver leaf gelatine then pass through a sieve into a bowl. Pour into the lined moulds and set in fridge until needed",
+        "Mix the lemon zest with the mascarpone cheese and sugar, spoon into a piping bag and store in the fridge until needed",
+        "Mix the freeze-dried strawberry, yoghurt, raspberry and popping candy in a bowl to make a crumb",
+        "Remove the strawberry \"pillow\" from the freezer. Using a melon baller, scoop out some of the middle, then fill the hole with the mascarpone mixture. Return to the fridge",
+        "Pop the mascarpone-filled strawberry pillows out of the moulds and stick them together to make a ball, repeat to make 3 more. Roll each ball until evenly coated and set aside",
+        "Cut the fresh strawberries into a 1/2cm dice and mix with a little of the remaining strawberry juice from step 1 and set aside",
+        "Remove the elderflower cremes from the moulds and place in the centre of each bowl. Place the ball on top of the crème, then spoon around the diced strawberries and juice. Scatter with some sweet cicely and serve"
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-1",
+      "0-2",
+      "0-15",
+      "0-3",
+      "0-16",
+      "0-9",
+      "0-5",
+      "0-14",
+      "0-0",
+      "0-20"
+    ],
+    "step-1": [],
+    "step-2": [
+      "0-4",
+      "0-3",
+      "0-16",
+      "0-1",
+      "0-12",
+      "0-0",
+      "0-20"
+    ],
+    "step-3": [
+      "0-16",
+      "0-17",
+      "0-18"
+    ],
+    "step-4": [
+      "0-6",
+      "0-10",
+      "0-11",
+      "0-2",
+      "0-15",
+      "0-7",
+      "0-8",
+      "0-9"
+    ],
+    "step-5": [
+      "0-12",
+      "0-4"
+    ],
+    "step-6": [
+      "0-13",
+      "0-14",
+      "0-2",
+      "0-15",
+      "0-9",
+      "0-1"
+    ],
+    "step-7": [
+      "0-16",
+      "0-17",
+      "0-18",
+      "0-19",
+      "0-0",
+      "0-20"
+    ],
+    "step-8": [
+      "0-13",
+      "0-16",
+      "0-17",
+      "0-18",
+      "0-0",
+      "0-20"
+    ],
+    "step-9": [
+      "0-13",
+      "0-16",
+      "0-0",
+      "0-20"
+    ],
+    "step-10": [
+      "0-16",
+      "0-1",
+      "0-0",
+      "0-20"
+    ],
+    "step-11": [
+      "0-21",
+      "0-7",
+      "0-16",
+      "0-1",
+      "0-0",
+      "0-20",
+      "0-6"
+    ]
+  }
+}

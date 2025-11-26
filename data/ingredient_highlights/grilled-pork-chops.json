@@ -1,0 +1,105 @@
+{
+  "id": "grilled-pork-chops",
+  "title": "Grilled pork chops",
+  "sourceUrl": "https://www.jamieoliver.com/recipes/pork/grilled-pork-chops-with-peach/",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "4 x 250g higher-welfare pork chops, with rind",
+        "1 red onion",
+        "1 fresh red chilli",
+        "2 peaches",
+        "olive oil",
+        "1 lemon",
+        "1 bunch of fresh mint (30g)",
+        "2 leeks",
+        "2 zucchini",
+        "2 mixed-colour capsicums",
+        "1 bunch of fresh parsley (30g)",
+        "150g feta cheese",
+        "200g couscous",
+        "extra virgin olive oil",
+        "BARBECUE KIT:",
+        "Weber barbecue tongs"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Prepare the barbecue for direct cooking using high heat (260°C-290°C), with all the burgers on high. Preheat for 15 minutes.",
+        "Remove the rind from the pork chops, along with half of the thick layer of fat across the top, scoring the remaining fat with a sharp knife. Season all over with sea salt and black pepper.",
+        "For the peach salsa, peel and quarter the onion, prick the chilli, then halve and destone the peaches, rubbing the cut sides with a little olive oil. Halve the lemon and cook it all cut-side down for 5 minutes with the lid closed, until nicely grill-marked and softened, flipping halfway.",
+        "Once the chilli is cool enough to handle, discard its seeds and stalk, then finely chop with most of the mint leaves (saving a few pretty leaves for garnish), along with the red onion and peaches. Scrape it all onto a serving platter, squeeze over half the charred lemon juice, then season to perfection.",
+        "Grill the whole leeks for 10 minutes with the lid closed, until blackened, turning regularly. Halve the zucchini lengthways, then take the capsicums and deseed, core and cut them into 5cm pieces. Grill it all for 5 minutes, turning regularly, or until beautifully soft. Remove it all to a board.",
+        "Cook the pork chops for 7 minutes, turning halfway, then arrange on top of the salsa and leave to rest.",
+        "Wash the bunch of parsley. Rub the feta all over with olive oil and black pepper, then gently press the parsley onto both sides (so it doesn’t fall through the grill). Cook for 5 minutes with the lid down, or until the feta is soft, flipping halfway.",
+        "Cook the couscous according to packet instructions in a large serving bowl.",
+        "Peel the charred leeks, discarding the blackened skin, and roughly chop the soft middles along with the capsicums and zucchini, then stir into the couscous. Break over the softened feta, squeeze over the remaining charred lemon juice and drizzle with 2 tablespoons of extra virgin olive oil. Mix together and season to perfection. Serve with the pork chops and peach salsa, garnished with the reserved mint leaves. Enjoy!"
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-6",
+      "0-14",
+      "0-15"
+    ],
+    "step-1": [
+      "0-0",
+      "0-9"
+    ],
+    "step-2": [
+      "0-3",
+      "0-4",
+      "0-5",
+      "0-13",
+      "0-6",
+      "0-1",
+      "0-2"
+    ],
+    "step-3": [
+      "0-1",
+      "0-2",
+      "0-3",
+      "0-5",
+      "0-6"
+    ],
+    "step-4": [
+      "0-7",
+      "0-8",
+      "0-6",
+      "0-9"
+    ],
+    "step-5": [
+      "0-6",
+      "0-0"
+    ],
+    "step-6": [
+      "0-4",
+      "0-6",
+      "0-10",
+      "0-13",
+      "0-9",
+      "0-11"
+    ],
+    "step-7": [
+      "0-12"
+    ],
+    "step-8": [
+      "0-3",
+      "0-4",
+      "0-5",
+      "0-7",
+      "0-8",
+      "0-12",
+      "0-13",
+      "0-6",
+      "0-9",
+      "0-0",
+      "0-11"
+    ]
+  }
+}

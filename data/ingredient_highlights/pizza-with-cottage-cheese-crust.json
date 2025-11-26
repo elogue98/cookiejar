@@ -1,0 +1,66 @@
+{
+  "id": "pizza-with-cottage-cheese-crust",
+  "title": "Pizza with Cottage Cheese Crust",
+  "sourceUrl": "https://pinchofyum.com/my-new-favorite-pizza-has-a-cottage-cheese-crust",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "1 cup cottage cheese",
+        "1 cup flour + a few tablespoons for dusting",
+        "1 teaspoons baking powder",
+        "1 teaspoons coarse kosher salt",
+        "1–2 tablespoons olive oil"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "PREHEAT:",
+        "Preheat the oven to 450 degrees and place a rack at the highest position, near the top.",
+        "PREP COTTAGE CHEESE:",
+        "Blend the cottage cheese until smooth.",
+        "MAKE DOUGH FOR CRUST:",
+        "Place blended cottage cheese in a bowl; mix with the flour, baking powder and salt until a dough starts to come together. It will start to get kind of shaggy, crumbly, and sticky – use your hands to really bring it together. I usually turn it out on the counter and give it a few squishes, coating with a bit of extra flour, to make it into a cohesive ball.",
+        "FORM THE CRUST:",
+        "Place a sheet of parchment on a pizza pan or baking sheet. Place the dough on the parchment and press into a circle that is about 10-12 inches in diameter. It is a pretty bready crust, so you want to really press it out into a thinner, wider surface area.",
+        "PREP THE CRUST:",
+        "Rub the top of the crust with olive oil.",
+        "PRE-BAKE THE CRUST:",
+        "Place in the oven; bake (no toppings) for 8-10 minutes.",
+        "ADD SAUCE AND CHEESE:",
+        "Remove from oven. Spread with sauce and top with the two cheeses. Bake on that same top rack for another 5 minutes to melt the cheeses.",
+        "BROIL AND FINISH:",
+        "Finally, broil for 2-3 minutes until the cheese and crust edges are deeply golden, like the picture. I like to sprinkle the slices with red pepper flakes, drizzle with olive oil or hot honey, and dip into more sauce! It’s too good!"
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [],
+    "step-1": [
+      "0-0"
+    ],
+    "step-2": [
+      "0-0",
+      "0-2",
+      "0-1",
+      "0-3"
+    ],
+    "step-3": [
+      "0-2"
+    ],
+    "step-4": [
+      "0-4"
+    ],
+    "step-5": [],
+    "step-6": [
+      "0-0"
+    ],
+    "step-7": [
+      "0-4",
+      "0-0"
+    ]
+  }
+}

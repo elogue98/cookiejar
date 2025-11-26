@@ -1,0 +1,65 @@
+{
+  "id": "tonkatsu-japanese-breaded-pork-cutlets",
+  "title": "Tonkatsu (Japanese Breaded Pork Cutlets)",
+  "sourceUrl": "https://www.seriouseats.com/tonkatsu-chicken-pork-katsu-japanese-breaded-cutlets-recipe",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "2 boneless, skinless chicken breast halves, about 8 ounces (225g) each; or 4 boneless, skinless chicken thighs, 4 to 5 ounces (110 to 140g) each; or 4 boneless pork sirloin cutlets, 4 to 5 ounces (110 to 140g) each",
+        "Kosher salt and freshly ground black pepper",
+        "1 1/2 cups Japanese-style panko bread crumbs (about 5 ounces; 140g)",
+        "1 cup all-purpose flour (about 5 ounces; 140g)",
+        "3 large eggs, thoroughly beaten",
+        "Vegetable, canola, or peanut oil, for frying",
+        "Finely shredded green cabbage",
+        "Lemon wedges",
+        "Steamed white rice",
+        "Japanese-style pickles (sunomono), optional",
+        "Homemade or store-bought tonkatsu sauce"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Place cutlets, one at a time, in a heavy-duty zipper-lock bag and pound gently to 1/4-inch thickness using a meat pounder or the bottom of a heavy 8-inch skillet. Season generously with salt and pepper.",
+        "If using slices of fresh Japanese milk bread: Using a sharp or serrated knife, trim crust from milk bread; discard trimmings. Cut trimmed bread lengthwise into 1 1/2-inch-thick batons. Using a food processor fitted with the grater attachment, process bread into coarse flakes.",
+        "Fill 3 wide, shallow bowls or high-rimmed plates with flour, beaten eggs, and panko, respectively. Working with one cutlet at a time, dredge in flour with your first hand, shaking off excess. Transfer to egg dish, then turn cutlet with your second hand to coat both sides. Lift and allow excess egg to drain off, then transfer to breadcrumb mixture. With your first hand, scoop breadcrumbs on top of cutlet, then gently press, turning to ensure a good layer of crumbs on both sides. Transfer cutlet to a clean plate and repeat with remaining meat. If this is done properly, your first hand should touch only dry ingredients, while your second hand should touch only wet, making the process less messy.",
+        "Fill a large cast iron or stainless steel skillet with 1/3 inch oil. (To speed things up even more, use 2 skillets simultaneously.) Heat over high heat until shimmering and just shy of smoking, about 350°F (175°C) on an instant-read thermometer.",
+        "Using tongs or your fingers, gently lower cutlets into hot fat, laying them down away from you to prevent hot fat from splashing toward you. (Work in batches if necessary.) Fry, gently swirling pan and rotating cutlets for even browning, and adjusting heat as necessary for a steady, vigorous bubble (around 300 to 325°F; 150 to 160°C), until bottom side is set, about 1 1/2 minutes. Flip cutlets and fry until other side is set, about 1 1/2 minutes longer. Continue cooking, swirling frequently and flipping occasionally, until well browned on both sides, about 3 minutes longer. Transfer to paper towels to drain and season with salt right away. Repeat with remaining cutlets.",
+        "Slice tonkatsu into thin strips and serve immediately with shredded cabbage, lemon wedges, white rice, Japanese pickles (if desired), and tonkatsu sauce."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-0",
+      "0-1"
+    ],
+    "step-1": [
+      "0-2"
+    ],
+    "step-2": [
+      "0-2",
+      "0-3",
+      "0-4",
+      "0-0"
+    ],
+    "step-3": [
+      "0-5"
+    ],
+    "step-4": [
+      "0-0",
+      "0-1"
+    ],
+    "step-5": [
+      "0-7",
+      "0-8",
+      "0-9",
+      "0-6",
+      "0-10"
+    ]
+  }
+}

@@ -1,0 +1,177 @@
+{
+  "id": "mexican-shredded-beef-and-tacos",
+  "title": "Mexican Shredded Beef (and Tacos)",
+  "sourceUrl": "https://www.recipetineats.com/mexican-shredded-beef-and-tacos/",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "SPICE MIX:",
+        "- ▢ 1 1/2 tbsp chipotle powder , adjust spiciness to taste (Note 5)",
+        "- ▢ 1 tbsp paprika",
+        "- ▢ 1 tbsp dried oregano",
+        "- ▢ 1 tsp All Spice powder (ground All Spice)",
+        "- ▢ 1 tsp coriander powder",
+        "- ▢ 2 tsp onion powder or garlic powder OR 1 tsp of each",
+        "- ▢ 1 tsp salt and pepper , each",
+        "BEEF:",
+        "- ▢ 1 – 2 tbsp olive oil",
+        "- ▢ 3 lb / 1.5kg beef chuck or brisket (or gravy or any other slow cooking beef) cut into 4 pieces",
+        "- ▢ 5 garlic cloves, minced",
+        "- ▢ 1 onion , diced (yellow, brown or white)",
+        "- ▢ 3/4 cup (185 ml) orange juice",
+        "- ▢ 2 tbsp lime juice",
+        "- ▢ 14 oz / 400g can crushed tomatoes",
+        "- ▢ 2 cups (500 ml) beef or chicken broth/stock",
+        "- ▢ 1/2 cup (125ml) water",
+        "- ▢ Salt and pepper"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Combine the Spice Mix ingredients in a bowl. Sprinkle 4 teaspoons over the beef and pat so it sticks.",
+        "Combine the Spice Mix ingredients in a bowl. Sprinkle 4 teaspoons over the beef and pat so it sticks.",
+        "Heat the olive oil in a large heavy based pot over high heat. Add the beef (in batches if necessary) and brown well on all sides. Remove onto a plate.",
+        "Heat the olive oil in a large heavy based pot over high heat. Add the beef (in batches if necessary) and brown well on all sides. Remove onto a plate.",
+        "Turn the stove down to medium. If the pot looks dry, add more olive oil.",
+        "Turn the stove down to medium. If the pot looks dry, add more olive oil.",
+        "Add the garlic and onion and cook for 3 minutes until soft.",
+        "Add the garlic and onion and cook for 3 minutes until soft.",
+        "Add the orange juice and lime juice, and scrape the bottom of the pot so the brown bits mix into the liquid.",
+        "Add the orange juice and lime juice, and scrape the bottom of the pot so the brown bits mix into the liquid.",
+        "Add tomato, beef stock, water and remaining spice mix. Mix, then return beef into pot.",
+        "Add tomato, beef stock, water and remaining spice mix. Mix, then return beef into pot.",
+        "Put the lid on, bring to a simmer then turn the stove down so it is bubbling gently, not rapidly.",
+        "Put the lid on, bring to a simmer then turn the stove down so it is bubbling gently, not rapidly.",
+        "Cook for 2 hours, then remove lid and simmer for another 30 minutes until beef is tender enough to shred. (Note 2 other cook methods).",
+        "Cook for 2 hours, then remove lid and simmer for another 30 minutes until beef is tender enough to shred. (Note 2 other cook methods).",
+        "Remove the beef from sauce, shred with 2 forks.",
+        "Remove the beef from sauce, shred with 2 forks.",
+        "Leave the sauce to simmer with the lid off for 10 to 15 minutes to reduce and thicken to your taste. Adjust salt to taste. Optional: puree with stick blender to make it smooth (I do this for company)",
+        "Leave the sauce to simmer with the lid off for 10 to 15 minutes to reduce and thicken to your taste. Adjust salt to taste. Optional: puree with stick blender to make it smooth (I do this for company)",
+        "Toss beef back into the sauce (can reserve some Sauce for drizzling on tacos if you want, there’s plenty).",
+        "Toss beef back into the sauce (can reserve some Sauce for drizzling on tacos if you want, there’s plenty).",
+        "Transfer beef into large dish and serve. See notes for suggestions.",
+        "Transfer beef into large dish and serve. See notes for suggestions.",
+        "TACOS:",
+        "To make tacos, serve the beef with warmed small tortillas, avocado slices, Pico de Gallo, shredded cheese, sour cream, lime wedges and extra cilantro/coriander leaves.",
+        "To make tacos, serve the beef with warmed small tortillas, avocado slices, Pico de Gallo, shredded cheese, sour cream, lime wedges and extra cilantro/coriander leaves."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-0",
+      "0-8",
+      "0-16"
+    ],
+    "step-1": [
+      "0-0",
+      "0-8",
+      "0-16"
+    ],
+    "step-2": [
+      "0-8",
+      "0-9",
+      "0-4"
+    ],
+    "step-3": [
+      "0-8",
+      "0-9",
+      "0-4"
+    ],
+    "step-4": [
+      "0-9"
+    ],
+    "step-5": [
+      "0-9"
+    ],
+    "step-6": [
+      "0-12",
+      "0-6",
+      "0-11"
+    ],
+    "step-7": [
+      "0-12",
+      "0-6",
+      "0-11"
+    ],
+    "step-8": [
+      "0-13",
+      "0-14",
+      "0-0"
+    ],
+    "step-9": [
+      "0-13",
+      "0-14",
+      "0-0"
+    ],
+    "step-10": [
+      "0-0",
+      "0-8",
+      "0-17",
+      "0-16",
+      "0-15"
+    ],
+    "step-11": [
+      "0-0",
+      "0-8",
+      "0-17",
+      "0-16",
+      "0-15"
+    ],
+    "step-12": [],
+    "step-13": [],
+    "step-14": [
+      "0-8"
+    ],
+    "step-15": [
+      "0-8"
+    ],
+    "step-16": [
+      "0-8"
+    ],
+    "step-17": [
+      "0-8"
+    ],
+    "step-18": [
+      "0-16",
+      "0-1",
+      "0-18",
+      "0-7"
+    ],
+    "step-19": [
+      "0-16",
+      "0-1",
+      "0-18",
+      "0-7"
+    ],
+    "step-20": [
+      "0-8",
+      "0-15"
+    ],
+    "step-21": [
+      "0-8",
+      "0-15"
+    ],
+    "step-22": [
+      "0-8"
+    ],
+    "step-23": [
+      "0-8"
+    ],
+    "step-24": [
+      "0-8",
+      "0-5",
+      "0-14"
+    ],
+    "step-25": [
+      "0-8",
+      "0-5",
+      "0-14"
+    ]
+  }
+}

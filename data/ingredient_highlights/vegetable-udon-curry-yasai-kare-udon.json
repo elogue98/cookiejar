@@ -1,0 +1,128 @@
+{
+  "id": "vegetable-udon-curry-yasai-kare-udon",
+  "title": "Vegetable udon curry (yasai kare udon)",
+  "sourceUrl": "https://www.theguardian.com/food/2025/nov/25/vegetable-udon-curry-recipe-emiko-davies",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "2 x 12cm pieces kombu",
+        "1litre cold water",
+        "2tbsp butter",
+        "4cm knob fresh ginger peeled and finely grated",
+        "1 onion peeled and sliced",
+        "0.5 aubergine diced",
+        "1pinch of salt",
+        "1 carrot peeled and chopped into chunky slices",
+        "200g potato (floury will be softer, waxy will be firmer), peeled and chopped",
+        "1tbsp Japanese curry powder",
+        "2tsp garam masala",
+        "2tbsp mirin or sake",
+        "1litre dashi (see above and method)",
+        "1tbsp soy sauce",
+        "0.5 green bell pepper seeds and pith discarded, flesh thinly sliced",
+        "2tsp potato starch or cornflour",
+        "2tbsp miso",
+        "4servings udon noodles"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "First, make the dashi, which you can do in one of two ways.",
+        "For the lengthier, cold infusion method, put the kombu and cold water in a container or jar, cover and leave in the fridge overnight to infuse.",
+        "The next morning, lift out and discard the kombu, and the dashi is now ready to use.",
+        "If you don’t have time to make the cold infusion, simply put the kombu and water in a saucepan over a low heat, so it warms up and draws out the flavour as slowly as possible.",
+        "Just before the liquid starts to boil, take off the heat, remove the kombu and your dashi is ready.",
+        "Now for the curry.",
+        "Melt the butter in a heavy-based saucepan or donabe on a medium heat, then stir in the ginger, onion, aubergine and salt.",
+        "Stir to coat everything in the buttery ginger for about two minutes, being careful the onion doesn’t burn, then add the carrot and potato.",
+        "Tip in the curry powder and garam masala, and stir to coat the vegetables.",
+        "Pour in the mirin, followed quickly by the dashi and soy, then bring to a simmer and leave the vegetables to cook for about 10 minutes, until tender.",
+        "Add the green pepper and cook for a couple of minutes more.",
+        "Meanwhile, make a slurry by mixing the potato starch with a splash of water until dissolved, then stir this into the curry along with the miso, and leave to bubble and thicken for a minute.",
+        "Cook the noodles according to the packet instructions, then drain and rinse under cold water – this will give them a bit of spring.",
+        "Distribute the noodles between four bowls and pour the vegetable curry over the top."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-11",
+      "0-12"
+    ],
+    "step-1": [
+      "0-1",
+      "0-0"
+    ],
+    "step-2": [
+      "0-12",
+      "0-0",
+      "0-14"
+    ],
+    "step-3": [
+      "0-11",
+      "0-1",
+      "0-0",
+      "0-17"
+    ],
+    "step-4": [
+      "0-11",
+      "0-12",
+      "0-0"
+    ],
+    "step-5": [
+      "0-9"
+    ],
+    "step-6": [
+      "0-2",
+      "0-4",
+      "0-5",
+      "0-6",
+      "0-3",
+      "0-14"
+    ],
+    "step-7": [
+      "0-2",
+      "0-4",
+      "0-8",
+      "0-3",
+      "0-7",
+      "0-15",
+      "0-14"
+    ],
+    "step-8": [
+      "0-10",
+      "0-9"
+    ],
+    "step-9": [
+      "0-12",
+      "0-11",
+      "0-13"
+    ],
+    "step-10": [
+      "0-4",
+      "0-14"
+    ],
+    "step-11": [
+      "0-8",
+      "0-16",
+      "0-15",
+      "0-11",
+      "0-1",
+      "0-9",
+      "0-14"
+    ],
+    "step-12": [
+      "0-4",
+      "0-1",
+      "0-17"
+    ],
+    "step-13": [
+      "0-17",
+      "0-9"
+    ]
+  }
+}

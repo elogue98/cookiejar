@@ -505,7 +505,7 @@ export async function PUT(
               description: `User updated servings from ${oldMetadata?.servings || 'N/A'} to ${newMetadata?.servings || 'N/A'}`,
             })
           }
-        } catch (e) {
+        } catch {
           // If notes aren't JSON, skip metadata versioning
         }
       }
@@ -548,4 +548,3 @@ export async function PUT(
     )
   }
 }
-

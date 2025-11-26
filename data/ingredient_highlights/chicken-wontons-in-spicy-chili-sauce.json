@@ -1,0 +1,45 @@
+{
+  "id": "chicken-wontons-in-spicy-chili-sauce",
+  "title": "Chicken Wontons in Spicy Chili Sauce",
+  "sourceUrl": "https://pinchofyum.com/chicken-wontons-in-spicy-chili-sauce",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "3 tablespoons sesame oil, divided",
+        "14 ounces shiitake mushrooms, sliced",
+        "1 clove garlic, grated",
+        "one 12-ounce bag frozen wontons (I like the mini chicken cilantro ones from Trader Joe’s or Costco)",
+        "1–2 cups chicken broth (depending on how soupy you like it)",
+        "1/2 cup teriyaki sauce",
+        "1–2 tablespoons chili crisp"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Heat 1 tablespoon sesame oil in a large nonstick skillet over medium heat. Add mushrooms; sauté until softened and yummy. Add garlic for the last minute or two of sautéing.",
+        "Add the frozen wontons, chicken broth, and teriyaki sauce. Simmer for 5 minutes, with a lid on, until the wontons are heated through.",
+        "Finish with remaining 2 tablespoons sesame oil, chili crisp, and top with sesame seeds and scallions."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-0",
+      "0-2",
+      "0-1"
+    ],
+    "step-1": [
+      "0-4",
+      "0-5",
+      "0-3"
+    ],
+    "step-2": [
+      "0-0",
+      "0-6"
+    ]
+  }
+}

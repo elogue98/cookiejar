@@ -1,0 +1,51 @@
+{
+  "id": "bbq-salmon-bowls-with-mango-avocado-salsa",
+  "title": "BBQ Salmon Bowls with Mango Avocado Salsa",
+  "sourceUrl": "https://pinchofyum.com/bbq-salmon-mango-salsa",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "1–2 lbs. fresh salmon",
+        "2 tablespoons brown sugar",
+        "2 teaspoons smoked paprika",
+        "2 teaspoons onion powder",
+        "1 teaspoon garlic powder",
+        "1/2 teaspoon chili powder",
+        "1/2 teaspoon kosher salt (more for a larger filet)",
+        "2 tablespoons olive oil"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "MANGO SALSA:",
+        ": Toss all ingredients in a bowl to combine. Taste, adjust, try not to eat the whole bowl.",
+        "COOK YOUR RICE:",
+        "Get your rice cooking according to package directions.",
+        "GET THE OVEN READY:",
+        "Preheat the oven to 475 degrees. Line a baking sheet with foil. Alternatively, you can set it to 500 degrees on the broil setting for medium rare with a yummy crispy top – the risk here is that you have to watch closely so it doesn’t burn the sugar. If taking this route, make sure one of the oven racks is close-ish to the top, about 6 inches or so.",
+        "SALMON:",
+        "Mix the spices and the olive oil to make a paste. Place the salmon skin side down on the baking sheet. Rub the paste liberally over the top part of the salmon. Bake for 6-12 minutes depending on the thickness of your salmon and your desired doneness. See notes if you’re not sure.",
+        "BOWL IT UP:",
+        "Pile up some rice, pull off some of salmon, and spoon that mango avocado salsa over the whole thing. Add a lime squeezer for good measure. IT’S SO GOOD."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [],
+    "step-1": [],
+    "step-2": [
+      "0-1"
+    ],
+    "step-3": [
+      "0-0",
+      "0-7"
+    ],
+    "step-4": [
+      "0-0"
+    ]
+  }
+}

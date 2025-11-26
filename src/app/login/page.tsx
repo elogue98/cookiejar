@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/lib/userContext'
@@ -126,16 +127,18 @@ export default function LoginPage() {
             >
               {/* Avatar */}
               <div
-                className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden mb-4 transition-transform duration-300 group-hover:scale-110"
+                className="relative w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden mb-4 transition-transform duration-300 group-hover:scale-110"
                 style={{
                   border: '3px solid #DDC57A',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                 }}
               >
-                <img
+                <Image
                   src={user.avatar_url}
                   alt={user.name}
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="(min-width: 768px) 160px, 128px"
+                  className="object-cover"
                 />
               </div>
 

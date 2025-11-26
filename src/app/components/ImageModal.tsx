@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useEffect } from 'react'
 
 interface ImageModalProps {
@@ -53,20 +54,21 @@ export default function ImageModal({ imageUrl, alt, isOpen, onClose }: ImageModa
           position: 'relative',
           maxWidth: '90vw',
           maxHeight: '90vh',
+          width: '90vw',
+          height: '90vh',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <img
+        <Image
           src={imageUrl}
           alt={alt}
+          fill
+          unoptimized
+          sizes="90vw"
           style={{
-            maxWidth: '100%',
-            maxHeight: '90vh',
-            width: 'auto',
-            height: 'auto',
             objectFit: 'contain',
             borderRadius: 'var(--radius-lg)',
           }}
@@ -105,4 +107,3 @@ export default function ImageModal({ imageUrl, alt, isOpen, onClose }: ImageModa
     </div>
   )
 }
-

@@ -124,7 +124,7 @@ Return ONLY the JSON object, nothing else.`
     let mutatedRecipe
     try {
       mutatedRecipe = JSON.parse(response)
-    } catch (parseError) {
+    } catch {
       // Try to extract JSON from markdown code blocks if present
       const jsonMatch = response.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/) || response.match(/(\{[\s\S]*\})/)
       if (jsonMatch) {
@@ -154,4 +154,3 @@ Return ONLY the JSON object, nothing else.`
     )
   }
 }
-

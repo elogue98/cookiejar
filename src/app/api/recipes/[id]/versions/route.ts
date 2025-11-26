@@ -79,7 +79,7 @@ export async function GET(
             ? JSON.parse(version.previous_value) 
             : version.previous_value
         }
-      } catch (e) {
+      } catch {
         previousValue = version.previous_value
       }
 
@@ -89,7 +89,7 @@ export async function GET(
             ? JSON.parse(version.new_value) 
             : version.new_value
         }
-      } catch (e) {
+      } catch {
         newValue = version.new_value
       }
 
@@ -126,4 +126,3 @@ export async function GET(
     )
   }
 }
-

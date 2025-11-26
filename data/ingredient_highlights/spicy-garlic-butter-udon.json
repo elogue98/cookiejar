@@ -1,0 +1,80 @@
+{
+  "id": "spicy-garlic-butter-udon",
+  "title": "Spicy garlic butter udon",
+  "sourceUrl": "https://www.jamieoliver.com/recipes/noodles/spicy-garlic-butter-udon/",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "2 medium eggs",
+        "2 x 250g packets of frozen (or fresh) udon noodles",
+        "1 tbsp salted butter",
+        "3 garlic cloves, very finely chopped",
+        "1 shallot, finely chopped",
+        "2 tbsp gochujang paste",
+        "200ml single cream",
+        "3 tbsp light soy sauce",
+        "40g Parmesan, grated",
+        "2 spring onions, thinly sliced",
+        "For the smashed cucumber",
+        "½ cucumber",
+        "1 garlic clove, very finely chopped",
+        "1 tsp chilli flakes",
+        "1 tbsp sesame seeds",
+        "2 tbsp apple cider vinegar (or any clear vinegar)",
+        "1 tsp granulated sugar",
+        "1 tbsp light soy sauce",
+        "1 tbsp sesame oil"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Bring a saucepan of water to the boil and gently add the eggs. Cook for 6 minutes, then transfer the eggs to a bowl of ice-cold water.",
+        "Next make the smashed cucumber. Grab the cucumber and whack it with a rolling  or the side of a cleaver. Cut it into 1cm slices, then transfer to a bowl. Add all the remaining ingredients, mix well and set aside.",
+        "Bring a saucepan of water to the boil and cook the noodles for 3 minutes, then drain and set aside.",
+        "Heat the butter in a large frying pan over a medium heat, then add the garlic and shallots and fry for 30 seconds. Add the gochujang and mix to combine for about 1 minute until the butter turns a reddish hue. Add the cream, soy sauce and Parmesan and cook for a further 2 minutes, stirring to combine.",
+        "Remove the pan from the heat, add the noodles and mix gently until the sauce has coated the noodles.",
+        "Transfer the noodles to shallow bowls. Peel the eggs and slice in half, then place on top of the noodles, followed by the smashed cucumber and finally a heap of spring onion. Enjoy!"
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-0"
+    ],
+    "step-1": [
+      "0-10",
+      "0-11"
+    ],
+    "step-2": [
+      "0-1"
+    ],
+    "step-3": [
+      "0-2",
+      "0-4",
+      "0-8",
+      "0-7",
+      "0-17",
+      "0-9",
+      "0-12",
+      "0-6",
+      "0-5"
+    ],
+    "step-4": [
+      "0-7",
+      "0-17",
+      "0-1"
+    ],
+    "step-5": [
+      "0-0",
+      "0-4",
+      "0-9",
+      "0-10",
+      "0-11",
+      "0-1"
+    ]
+  }
+}

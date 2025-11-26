@@ -1,0 +1,43 @@
+{
+  "id": "butternut-squash-salad",
+  "title": "Butternut squash salad",
+  "sourceUrl": "https://www.bbcgoodfood.com/recipes/butternut-squash-salad",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "1 butternut squash peeled, deseeded and diced",
+        "2 tsp olive oil",
+        "50g wild and brown rice",
+        "50g Puy lentils",
+        "1 head broccoli cut into florets",
+        "50g dried cranberries",
+        "25g pumpkin seeds",
+        "juice 1 lemon"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Heat oven to 200C/180C fan/gas 6. Spread the squash over a large baking sheet, drizzle over the oil and bake for 30 mins or until tender.",
+        "Meanwhile, cook the rice and lentils in boiling salted water for 20 mins, adding the broccoli for the final 4 mins of cooking. Drain well, then stir in the cranberries and pumpkin seeds with some seasoning. Add the squash, pour over the lemon juice and serve."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-1",
+      "0-0"
+    ],
+    "step-1": [
+      "0-5",
+      "0-6",
+      "0-7",
+      "0-3",
+      "0-2",
+      "0-4"
+    ]
+  }
+}

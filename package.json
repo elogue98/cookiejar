@@ -7,7 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "auto:label": "tsx scripts/auto_label_highlights.ts",
+    "ai:auto-label": "tsx scripts/ai_auto_label_highlights.ts",
+    "report:highlights": "tsx scripts/report_highlight_gaps.ts",
+    "label:highlights": "tsx scripts/label_highlights.ts",
+    "eval:highlights": "tsx scripts/eval_highlights.ts",
+    "import:highlights": "tsx scripts/import_highlight_recipes.ts",
+    "train:highlights": "tsx scripts/train_highlight_model.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.81.1",
@@ -29,6 +36,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "typescript": "^5",
     "vitest": "^4.0.13"
   }

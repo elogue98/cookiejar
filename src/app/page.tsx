@@ -22,7 +22,7 @@ export default async function Home() {
   }
 
   // Fetch all ratings for all recipes in one query
-  let averageRatingsMap: Record<string, number | null> = {}
+  const averageRatingsMap: Record<string, number | null> = {}
   try {
     const { data: allRatings, error: ratingsError } = await supabase
       .from('ratings')
@@ -66,7 +66,7 @@ export default async function Home() {
         .filter((id): id is string => typeof id === 'string' && id.length > 0)
     ),
   ]
-  let creatorsMap: Record<string, { id: string; name: string; avatar_url: string }> = {}
+  const creatorsMap: Record<string, { id: string; name: string; avatar_url: string }> = {}
   
   if (creatorIds.length > 0) {
     try {

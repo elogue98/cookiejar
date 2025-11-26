@@ -39,7 +39,7 @@ export default function RecipeComments({ recipeId }: RecipeCommentsProps) {
       } else {
         setError(data.error || 'Failed to load comments')
       }
-    } catch (err) {
+    } catch {
       setError('Failed to load comments')
     } finally {
       setIsLoading(false)
@@ -78,7 +78,7 @@ export default function RecipeComments({ recipeId }: RecipeCommentsProps) {
       } else {
         setError(data.error || 'Failed to post comment')
       }
-    } catch (err) {
+    } catch {
       setError('Failed to post comment')
     } finally {
       setIsSubmitting(false)
@@ -200,4 +200,3 @@ export default function RecipeComments({ recipeId }: RecipeCommentsProps) {
     </section>
   )
 }
-

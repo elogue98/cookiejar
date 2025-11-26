@@ -1,0 +1,53 @@
+{
+  "id": "light-and-fluffy-buttermilk-pancakes",
+  "title": "Light and Fluffy Buttermilk Pancakes",
+  "sourceUrl": "https://www.seriouseats.com/light-and-fluffy-pancakes-recipe",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "10 ounces (about 2 cups) all purpose flour",
+        "1 teaspoon baking powder",
+        "1/2 teaspoon baking soda",
+        "1 teaspoon kosher salt",
+        "1 tablespoon sugar",
+        "2 large eggs, separated",
+        "1 1/2 cups (about 12 ounces) buttermilk",
+        "1 cup (about 8 ounces) sour cream (see note)",
+        "4 tablespoons unsalted butter, melted, plus more for serving",
+        "Warm maple syrup"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "For the Dry Pancake Mix: Combine flour, baking powder, baking soda, salt, and sugar in a medium bowl and whisk until homogenous. Transfer to an airtight container. The mix will stay good for 3 months. (See note.)",
+        "For each Batch of Pancakes: Place one batch of dry mix in a large bowl. In a medium clean bowl, whisk the egg whites until stiff peaks form. In a large bowl, whisk the egg yolks, buttermilk, and sour cream until homogenous. Slowly drizzle in the melted butter while whisking. Carefully fold in the egg whites with a rubber spatula until just combined. Pour the mixture over the dry mix and fold until just combined (there should still be plenty of lumps).",
+        "Heat a large heavy-bottomed nonstick skillet over medium heat for 5 minutes (or use an electric griddle). Add a small amount of butter or oil to the griddle and spread with a paper towel until no visible butter or oil remains. Use a 1⁄4-cup dry measure to place 4 pancakes in the skillet and cook until bubbles start to appear on top and the bottoms are golden brown, about 2 minutes. Carefully flip the pancakes and cook on the second side until golden brown and completely set, about 2 minutes longer. Serve the pancakes immediately, or keep warm on a wire rack set on a rimmed baking sheet in a warm oven while you cook the remaining 3 batches. Serve with warm maple syrup and butter."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-1",
+      "0-2",
+      "0-4",
+      "0-3",
+      "0-0"
+    ],
+    "step-1": [
+      "0-5",
+      "0-6",
+      "0-7",
+      "0-8"
+    ],
+    "step-2": [
+      "0-9",
+      "0-8",
+      "0-1",
+      "0-2"
+    ]
+  }
+}

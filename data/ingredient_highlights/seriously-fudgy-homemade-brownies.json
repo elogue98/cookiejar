@@ -1,0 +1,57 @@
+{
+  "id": "seriously-fudgy-homemade-brownies",
+  "title": "Seriously Fudgy Homemade Brownies",
+  "sourceUrl": "https://sallysbakingaddiction.com/seriously-fudgy-homemade-brownies/",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "3/4 cup (12 Tbsp; 170g) unsalted butter",
+        "4-ounce (113g) semi-sweet chocolate bar, coarsely chopped and divided*",
+        "2 cups (400g) granulated sugar*",
+        "3 large eggs, at room temperature",
+        "2 teaspoons pure vanilla extract",
+        "1 cup (82g) unsweetened natural or dutch-process cocoa powder*",
+        "1 cup (125g) all-purpose flour (spooned & leveled)",
+        "1 teaspoon salt",
+        "optional: 1 and 1/4 cups (225g) semi-sweet chocolate chips"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Preheat the oven to 350°F (177°C) and grease a 9×13-inch pan or line with aluminum foil or parchment paper, leaving an overhang on the sides to lift the finished brownies out (makes cutting easier!). Set aside.",
+        "In a microwave-safe bowl, combine the butter and half (2 ounces/57g) of the chopped chocolate. Melt in 30-second increments, whisking after each, until completely smooth. Whisk in the sugar until completely combined, then whisk in the eggs and vanilla. The batter will be light brown and look a bit dull.",
+        "Add the cocoa powder, flour, salt, remaining 2 ounces/57g chopped chocolate, and the chocolate chips. Fold it all together with a silicone spatula or wooden spoon. Batter will be very thick. Spread evenly into prepared pan.",
+        "Bake for 30 minutes, then test the brownies with a toothpick. Insert it into the center of the pan. If it comes out with wet batter, the brownies are not done. If there are only a few moist crumbs, the brownies are done. Keep checking every 2 minutes until you have moist crumbs. Brownies typically take 31–32 minutes in my oven.",
+        "Remove from the oven and place on a wire rack to cool completely in the pan before cutting into squares.",
+        "Cover and store leftover brownies at room temperature for up to 1 week."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [],
+    "step-1": [
+      "0-0",
+      "0-2",
+      "0-4",
+      "0-3"
+    ],
+    "step-2": [
+      "0-0",
+      "0-6",
+      "0-7",
+      "0-5",
+      "0-8"
+    ],
+    "step-3": [
+      "0-0"
+    ],
+    "step-4": [],
+    "step-5": [
+      "0-3"
+    ]
+  }
+}

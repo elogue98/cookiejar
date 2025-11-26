@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabaseClient'
 import { generateTagsForRecipe } from '@/lib/aiTagging'
@@ -412,4 +413,3 @@ export async function POST(req: Request) {
     )
   }
 }
-

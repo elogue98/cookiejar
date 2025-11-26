@@ -1,0 +1,55 @@
+{
+  "id": "golden-soup",
+  "title": "Golden Soup",
+  "sourceUrl": "https://pinchofyum.com/golden-soup",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "2 tablespoons olive oil",
+        "half an onion, chopped",
+        "2 cloves garlic, chopped",
+        "1 head of cauliflower, chopped into about 5 cups of chunks or florets",
+        "1 cup cashews",
+        "1 tablespoon turmeric – see notes",
+        "7–8 cups water",
+        "2 teaspoons salt",
+        "a squeeze of lemon juice"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "SAUTÉ:",
+        "Heat the oil in a deep soup pot. Add the onion, garlic, cauliflower, cashews, and turmeric. Sauté for 10 minutes or until very fragrant.",
+        "SIMMER:",
+        "Add the water (I usually start with 4 cups) and salt. Simmer until softened.",
+        "BLEND:",
+        "Transfer the soup to a blender and blend into a creamy consistency. It’s best to do this in batches.",
+        "FINISH:",
+        "Return to the soup pot and add any additional water (remaining 2-3 cups) if you need to thin it out. Also a good time to season with more salt and a squeeze of lemon juice. Also a good time to top with spiced chickpeas and parsley and olive oil and more salt and put on your most comfy sweater and FALL IN LOVE. ♡"
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [],
+    "step-1": [
+      "0-0",
+      "0-1",
+      "0-2",
+      "0-3",
+      "0-4",
+      "0-5"
+    ],
+    "step-2": [],
+    "step-3": [
+      "0-6",
+      "0-7"
+    ],
+    "step-7": [
+      "0-8"
+    ]
+  }
+}

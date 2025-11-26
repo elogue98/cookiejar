@@ -1,0 +1,15 @@
+{
+  "weights": {
+    "overlapRatio": 6.131652534400669,
+    "weightCoverage": 6.131652534400669,
+    "hasHeadNoun": 2.018317509562213,
+    "phraseHit": -0.6256687091751727,
+    "synonymHit": 0.09251755899233,
+    "fuzzyHit": 0,
+    "uniqueHead": 0,
+    "tokenCount": 0.3364419667991424,
+    "sectionAlign": -1.976449716118861,
+    "seasoning": 0.9062178282070177
+  },
+  "bias": -1.976449716118861
+}

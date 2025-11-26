@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { NextResponse } from 'next/server'
 import * as cheerio from 'cheerio'
 import { createServerClient } from '@/lib/supabaseClient'
@@ -18,6 +19,9 @@ type InstructionSection = {
   section: string
   steps: string[]
 }
+
+type IngredientGroup = { section?: string; items: string[] }
+type InstructionGroup = { section?: string; steps: string[] }
 
 /**
  * Clean text by removing HTML, trimming whitespace, and removing common junk
@@ -1826,6 +1830,72 @@ function parseAIFallback($: cheerio.CheerioAPI, baseUrl: string): ParsedRecipe |
   return null
 }
 
+async function generateExpectedMatchesAI(
+  ingredients: string[] | IngredientGroup[],
+  instructions: string[] | InstructionGroup[],
+): Promise<Record<string, string[]> | null> {
+  try {
+    const ingGroups: IngredientGroup[] = Array.isArray(ingredients) && ingredients.length > 0 && typeof ingredients[0] === 'object'
+      ? (ingredients as IngredientGroup[])
+      : [{ section: '', items: (ingredients as string[]) || [] }]
+
+    const instrGroups: InstructionGroup[] = Array.isArray(instructions) && instructions.length > 0 && typeof instructions[0] === 'object'
+      ? (instructions as InstructionGroup[])
+      : [{ section: '', steps: (instructions as string[]) || [] }]
+
+    const ingLines: string[] = []
+    ingGroups.forEach((group, gIdx) => {
+      (group.items || []).forEach((item, iIdx) => {
+        ingLines.push(`${gIdx}-${iIdx}: ${item}`)
+      })
+    })
+
+    const stepLines: string[] = []
+    let counter = 0
+    instrGroups.forEach((group) => {
+      (group.steps || []).forEach((step) => {
+        stepLines.push(`step-${counter}: ${step}`)
+        counter += 1
+      })
+    })
+
+    const prompt = `You are labeling which ingredients apply to each instruction step for a recipe.
+Return ONLY a JSON object mapping step ids to arrays of ingredient ids.
+
+Ingredients (id: text):
+${ingLines.join('\n')}
+
+Steps (id: text):
+${stepLines.join('\n')}
+
+Output format example:
+{
+  "step-0": ["0-1", "0-3"],
+  "step-1": []
+}`
+
+    const response = await aiComplete(
+      [
+        {
+          role: 'system',
+          content:
+            'You are an ingredient-to-step tagger. Return only valid JSON mapping step ids to ingredient id arrays.',
+        },
+        { role: 'user', content: prompt },
+      ],
+      { temperature: 0, response_format: { type: 'json_object' } },
+    )
+
+    const parsed = JSON.parse(response)
+    if (parsed && typeof parsed === 'object') {
+      return parsed as Record<string, string[]>
+    }
+  } catch (err) {
+    console.warn('AI expectedMatches generation failed:', err)
+  }
+  return null
+}
+
 /**
  * Main parsing function - 5-layer universal parser
  */
@@ -1960,6 +2030,28 @@ export async function POST(req: Request) {
       console.error('Error generating AI tags for imported recipe:', error)
     }
 
+    // Generate AI expectedMatches for highlighting
+    let aiExpectedMatches: Record<string, string[]> | null = null
+    if (!process.env.OPENAI_API_KEY) {
+      console.warn('Skipping AI expectedMatches: OPENAI_API_KEY missing')
+    } else {
+      try {
+        console.log('[import] OPENAI_API_KEY detected, generating expectedMatches...')
+        aiExpectedMatches = await generateExpectedMatchesAI(parsed.ingredients, parsed.instructions)
+        if (aiExpectedMatches) {
+          console.log(
+            `AI expectedMatches generated for import: ${parsed.title || 'untitled'} (${
+              Object.keys(aiExpectedMatches).length
+            } steps)`,
+          )
+        } else {
+          console.warn('[import] AI expectedMatches returned null/empty')
+        }
+      } catch (error) {
+        console.warn('[import] AI expectedMatches generation failed:', error)
+      }
+    }
+
     // Prepare data for Supabase
     const recipeData: any = {
       title: parsed.title,
@@ -1967,6 +2059,9 @@ export async function POST(req: Request) {
       instructions: parsed.instructions.length > 0 ? parsed.instructions.join('\n\n') : 'No instructions found',
       tags: aiTags,
       source_url: url,
+    }
+    if (aiExpectedMatches) {
+      recipeData.expected_matches = aiExpectedMatches
     }
 
     // Insert into Supabase
@@ -1976,7 +2071,7 @@ export async function POST(req: Request) {
     let data, error
     if (userId && typeof userId === 'string') {
       // Try with created_by
-      const result = await supabase
+      let result = await supabase
         .from('recipes')
         .insert({ ...recipeData, created_by: userId })
         .select()
@@ -1985,20 +2080,22 @@ export async function POST(req: Request) {
       data = result.data
       error = result.error
       
-      // If error is about missing column, retry without created_by
-      if (error && (error.message.includes('created_by') || error.message.includes('column') || error.code === '42703')) {
-        const retryResult = await supabase
+      // If error is about missing column, retry without created_by or expected_matches
+      if (error && (error.message.includes('created_by') || error.message.includes('expected_matches') || error.message.includes('column') || error.code === '42703')) {
+        const fallbackData = { ...recipeData }
+        delete (fallbackData as any).expected_matches
+        result = await supabase
           .from('recipes')
-          .insert(recipeData)
+          .insert(fallbackData)
           .select()
           .single()
         
-        data = retryResult.data
-        error = retryResult.error
+        data = result.data
+        error = result.error
       }
     } else {
       // No userId, insert without created_by
-      const result = await supabase
+      let result = await supabase
         .from('recipes')
         .insert(recipeData)
         .select()
@@ -2006,6 +2103,19 @@ export async function POST(req: Request) {
       
       data = result.data
       error = result.error
+
+      if (error && (error.message.includes('expected_matches') || error.message.includes('column') || error.code === '42703')) {
+        const fallbackData = { ...recipeData }
+        delete (fallbackData as any).expected_matches
+        result = await supabase
+          .from('recipes')
+          .insert(fallbackData)
+          .select()
+          .single()
+        
+        data = result.data
+        error = result.error
+      }
     }
 
     if (error) {

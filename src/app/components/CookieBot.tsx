@@ -279,10 +279,10 @@ export default function CookieBot({ recipeId, recipeTitle, ingredients, instruct
               <div className="text-sm text-center text-gray-500 mt-4">
                 Ask me anything about this recipe! Try:
                 <ul className="mt-2 space-y-1 text-left list-disc list-inside">
-                  <li>"Can I make this gluten-free?"</li>
-                  <li>"Halve this recipe"</li>
-                  <li>"Convert everything to grams"</li>
-                  <li>"What can I swap for buttermilk?"</li>
+                  <li>&quot;Can I make this gluten-free?&quot;</li>
+                  <li>&quot;Halve this recipe&quot;</li>
+                  <li>&quot;Convert everything to grams&quot;</li>
+                  <li>&quot;What can I swap for buttermilk?&quot;</li>
                 </ul>
               </div>
             )}
@@ -379,4 +379,3 @@ export default function CookieBot({ recipeId, recipeTitle, ingredients, instruct
     </>
   )
 }
-

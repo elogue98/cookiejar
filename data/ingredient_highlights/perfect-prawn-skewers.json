@@ -1,0 +1,88 @@
+{
+  "id": "perfect-prawn-skewers",
+  "title": "Perfect prawn skewers",
+  "sourceUrl": "https://www.jamieoliver.com/recipes/prawn/perfect-prawn-skewers/",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "1 x 400g tin of chickpeas",
+        "olive oil",
+        "red wine vinegar",
+        "1 teaspoon dried oregano",
+        "2 tablespoons capers",
+        "1 bunch of basil (30g)",
+        "3 lemons",
+        "extra virgin olive oil",
+        "4 heaped tablespoons garlic mayo",
+        "2 bulbs of fennel",
+        "1 bunch of spring onions",
+        "200g broccolini",
+        "200g asparagus",
+        "½ a fresh red chilli",
+        "16 large raw shell-on king prawns, from sustainable sources",
+        "BARBECUE KIT:",
+        "Weber deluxe grilling basket",
+        "Weber barbecue tongs",
+        "Weber barbecue skewers"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Place the grilling basket on the barbecue, then preheat the barbecue for direct cooking using high heat (260°C-290°C) for 15 minutes with the lid closed.",
+        "Drain the chickpeas and pat them dry, then place in a bowl with 1 tablespoon each of olive oil and red wine vinegar and a pinch of black pepper, along with the dried oregano and capers. Toss well to coat, then tip into the grilling basket and cook with the lid down for 8 minutes, or until golden and crisp, shaking the basket occasionally, then remove.",
+        "Meanwhile, make the basil aioli. Pick the basil leaves into a pestle and mortar and bash to a paste. Squeeze in the juice from one lemon half, then muddle in ½ a tablespoon of extra virgin olive oil, mix in the garlic mayo and spoon into a serving bowl.",
+        "Drizzle 2 tablespoons of extra virgin olive oil and 1 tablespoon of red wine vinegar onto a large serving platter with a pinch of sea salt and black pepper. Slice one lemon half into thin rounds. Slice the fennel into thin wedges, trim the spring onions, broccolini and asparagus, halving any larger stalks. Cook it all on the grill with the lid down for 5 minutes, or until charred and tender, turning halfway, then remove to the platter and toss in the dressing (I like to roughly chop up the spring onions, or you can leave them whole). Finely slice and scatter over the chilli, along with the crispy chickpeas.",
+        "Peel the prawns, leaving the tails and heads intact. Run a knife down the back of each prawn to open them up (this is called butterflying), and pull out the veins. Season with a pinch of salt, finely grate over the zest from 1 lemon and squeeze over the juice. Drizzle with 1 tablespoon of olive oil, toss together, then skewer up the prawns across 2 large metal skewers (or a large double-pronged skewer). Cook with the lid down for 6 minutes, or until the prawns are pink, turning halfway. Serve with the veg and chickpea platter, basil aioli and lemon wedges, for squeezing over."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-16",
+      "0-15",
+      "0-17",
+      "0-18"
+    ],
+    "step-1": [
+      "0-1",
+      "0-2",
+      "0-3",
+      "0-4",
+      "0-7",
+      "0-16",
+      "0-0",
+      "0-13"
+    ],
+    "step-2": [
+      "0-1",
+      "0-6",
+      "0-7",
+      "0-8",
+      "0-5"
+    ],
+    "step-3": [
+      "0-1",
+      "0-2",
+      "0-6",
+      "0-7",
+      "0-11",
+      "0-12",
+      "0-13",
+      "0-10",
+      "0-0",
+      "0-9"
+    ],
+    "step-4": [
+      "0-1",
+      "0-6",
+      "0-7",
+      "0-5",
+      "0-0",
+      "0-18"
+    ]
+  }
+}

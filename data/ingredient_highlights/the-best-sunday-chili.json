@@ -1,0 +1,71 @@
+{
+  "id": "the-best-sunday-chili",
+  "title": "The Best Sunday Chili",
+  "sourceUrl": "https://pinchofyum.com/sunday-chili",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "2 teaspoons salt",
+        "1 1/2 pounds ground beef",
+        "6 slices bacon, cut into small pieces",
+        "half of an onion, diced",
+        "4 cloves garlic, minced",
+        "1 jalapeno, minced",
+        "4 carrots, minced (optional)",
+        "2 1/2 tablespoons chili powder",
+        "2 tablespoons cumin",
+        "1 tablespoon oregano",
+        "1 teaspoon garlic powder",
+        "3–4 tablespoons tomato paste",
+        "one 28-ounce can fire roasted crushed tomatoes",
+        "two 14-ounce cans beans, rinsed and drained (I like black beans and pinto beans)",
+        "2 cups beef broth or chicken broth (plus more to thin as needed)",
+        "toppings: avocado, cheese, sour cream, tortilla chips, red onion, cilantro"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Mix salt with ground beef. Set aside so it can get nice and salty while you prep the other ingredients. In a large Dutch oven over medium high heat, fry your bacon pieces until crispy. Drain on paper towel lined plates. Pour off most of the bacon fat, but leave 1-2 tablespoons for sautéing.",
+        "Add the onion, garlic, jalapeno, and carrots. Sauté until soft and fragrant.",
+        "Add the ground beef and spices. Brown until fully cooked.",
+        "Add the tomato paste. Sauté for 2-3 minutes.",
+        "Add tomatoes, beans, broth, and bacon. Bring to a low simmer. Cover it and let it hang out over low heat for at least 30-45 minutes, but ideally 2+ hours (this helps the flavors develop and this is why it’s Sunday chili). You can alternate between keeping it over a low flame and just letting it rest in the hot pot. It will thicken, so use extra water or broth to thin it out to desired consistency.",
+        "BOOM! Top with all your favorite toppings. Make plans to revisit this again next Sunday."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-0",
+      "0-1",
+      "0-2",
+      "0-13"
+    ],
+    "step-1": [
+      "0-3",
+      "0-5",
+      "0-6",
+      "0-4",
+      "0-10"
+    ],
+    "step-2": [
+      "0-1"
+    ],
+    "step-3": [
+      "0-11",
+      "0-12"
+    ],
+    "step-4": [
+      "0-14",
+      "0-13",
+      "0-12",
+      "0-7",
+      "0-11"
+    ],
+    "step-5": []
+  }
+}

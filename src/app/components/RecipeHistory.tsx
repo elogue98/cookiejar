@@ -9,8 +9,8 @@ interface RecipeVersion {
   user_id: string
   timestamp: string
   field_changed: string
-  previous_value: any
-  new_value: any
+  previous_value: unknown
+  new_value: unknown
   description: string | null
   user: {
     id: string
@@ -213,4 +213,3 @@ export default function RecipeHistory({ recipeId }: RecipeHistoryProps) {
     </>
   )
 }
-

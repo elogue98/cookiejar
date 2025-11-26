@@ -1,0 +1,51 @@
+{
+  "id": "saucy-gochujang-noodles-with-chicken",
+  "title": "Saucy Gochujang Noodles with Chicken",
+  "sourceUrl": "https://pinchofyum.com/saucy-gochujang-noodles-with-chicken",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "3 tablespoons soy sauce",
+        "2–3 tablespoons gochujang sauce (like this one (affiliate link))",
+        "2 tablespoons tomato paste",
+        "2 tablespoons peanut butter",
+        "2 tablespoons water",
+        "1–2 tablespoons brown sugar",
+        "1 tablespoon sesame oil",
+        "1 clove minced garlic",
+        "1–2 cups broth or water for thinning the sauce"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Whisk the sauce ingredients (except the extra broth) in a small bowl or shake together in a jar. It should form a thick sauce.",
+        "Cook the chicken in a large skillet over medium high heat. Season generously with salt and pepper.",
+        "Boil the noodles for just a few minutes to soften. Drain and set aside.",
+        "When the chicken is done, add spinach, cooked noodles, and sauce to the pan, keeping it over medium high heat. Toss to combine; heat until the spinach is wilted. Add extra water or broth to thin the sauce, a little at a time, to get the sauciness that you like (I usually add about 1 1/2 cups total).",
+        "Serve topped with fresh herbs, scallions, chili oil, sesame seeds, and whatever else you like."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-8",
+      "0-0",
+      "0-1"
+    ],
+    "step-1": [],
+    "step-2": [],
+    "step-3": [
+      "0-4",
+      "0-8",
+      "0-0",
+      "0-1"
+    ],
+    "step-4": [
+      "0-6"
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Logo from '@/app/components/Logo'
@@ -76,10 +77,13 @@ export default function Navigation() {
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                   className="flex items-center gap-3 focus:outline-none group p-1 pr-3 rounded-full hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200"
                 >
-                  <img
+                  <Image
                     src={user.avatar_url}
                     alt={user.name}
-                    className="w-9 h-9 rounded-full border-2 border-white shadow-sm group-hover:border-[#D34E4E] transition-colors"
+                    width={36}
+                    height={36}
+                    sizes="36px"
+                    className="w-9 h-9 rounded-full border-2 border-white shadow-sm group-hover:border-[#D34E4E] transition-colors object-cover"
                   />
                   <div className="text-left">
                     <p className="text-sm font-semibold text-slate-900 group-hover:text-[#D34E4E] transition-colors">
@@ -210,10 +214,13 @@ export default function Navigation() {
                   {user ? (
                     <div className="space-y-3">
                       <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-xl">
-                        <img
+                        <Image
                           src={user.avatar_url}
                           alt={user.name}
-                          className="w-10 h-10 rounded-full border-2 border-white"
+                          width={40}
+                          height={40}
+                          sizes="40px"
+                          className="w-10 h-10 rounded-full border-2 border-white object-cover"
                         />
                         <div>
                           <p className="text-sm font-semibold text-slate-900">{user.name}</p>

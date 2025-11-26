@@ -40,13 +40,6 @@ function getMimeType(file: File | Buffer): string {
 }
 
 /**
- * Trim whitespace from strings in an array
- */
-function trimArray(arr: string[]): string[] {
-  return arr.map((item) => item.trim()).filter((item) => item.length > 0);
-}
-
-/**
  * Deduplicate lines in an array (case-insensitive)
  */
 function deduplicateArray(arr: string[]): string[] {
@@ -242,7 +235,7 @@ Return ONLY the JSON object, nothing else.`;
     try {
       // Try direct JSON parse
       parsed = JSON.parse(content);
-    } catch (parseError) {
+    } catch {
       // Try to extract JSON from markdown code blocks if present
       const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || 
                        content.match(/\{[\s\S]*\}/);

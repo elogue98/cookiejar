@@ -1,0 +1,109 @@
+{
+  "id": "kimchi-garlic-chicken-quesadillas",
+  "title": "Kimchi garlic chicken quesadillas",
+  "sourceUrl": "https://www.jamieoliver.com/recipes/mexican-style/kimchi-garlic-chicken-quesadillas/",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "4 boneless chicken thighs",
+        "1 tsp garlic powder",
+        "½ tsp chilli powder",
+        "1 tsp medium curry powder (or mild/hot, depending on your preference)",
+        "1 tbsp light soy sauce",
+        "½ tsp MSG (optional)",
+        "½ tsp granulated sugar",
+        "2 tbsp olive oil",
+        "2 large tortilla wraps",
+        "120g mozzarella, shredded",
+        "200g kimchi, finely chopped",
+        "1 onion, finely diced",
+        "4 tbsp unsalted butter",
+        "1 tsp paprika",
+        "2 garlic cloves, finely chopped",
+        "small bunch of chives, thinly sliced",
+        "small bunch of coriander, thinly sliced",
+        "1 lime, cut into wedges",
+        "salt and freshly ground black pepper",
+        "For the avocado cream",
+        "3 tbsp sour cream",
+        "2 avocados, cubed",
+        "small bunch of coriander",
+        "pinch of salt",
+        "juice of 1 lime",
+        "1–2 tbsp water"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Put the chicken thighs into a bowl with the garlic powder, chilli powder, curry powder, light soy sauce, MSG (if using), sugar, a pinch of salt, black pepper and 1 tablespoon of the olive oil. Mix well to coat thoroughly.",
+        "Next, make the avocado cream. Combine all the ingredients in a food processor and blend until smooth. Pour into a bowl and set aside.",
+        "Heat the remaining tablespoon of olive oil in a frying pan over a medium-high heat for 1–2 minutes, then gently place the chicken thighs in the pan and cook for 3–4 minutes on each side until slightly charred. Remove from the pan and leave to rest for 3–4 minutes, then chop into small pieces.",
+        "Grab a tortilla wrap and scatter half of the mozzarella on one half, spreading it all the way to the edge. Top with half the chicken, half the kimchi and half the diced onion, making sure to spread them out over the cheese. Fold the empty side of the tortilla over to close the quesadilla. Repeat with the remaining tortilla.",
+        "Melt 2 tablespoons of butter in a frying pan over a medium-high heat, then add the paprika and garlic. Cook for 2–3 minutes until fragrant, then reduce the heat to medium-low and add the chives.",
+        "Melt another tablespoon of butter in the pan and swirl to coat, then place the two folded tortillas in the pan, with the cheese on the bottom. Gently press down with your fingers. Cook for 2 minutes, then flip and add the remaining tablespoon of butter to the pan. Cook for a further 2 minutes, or until the cheese has melted and the tortilla has turned golden.",
+        "Remove the tortillas and slice them in half into triangles. Place two halves on a plate and drizzle over the garlic and chive butter. Sprinkle with the chopped coriander and garnish with lime wedges. Dip into the avocado cream or spoon onto each bite."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-0",
+      "0-1",
+      "0-2",
+      "0-3",
+      "0-4",
+      "0-5",
+      "0-6",
+      "0-7",
+      "0-18",
+      "0-23",
+      "0-14"
+    ],
+    "step-1": [
+      "0-19",
+      "0-20",
+      "0-21"
+    ],
+    "step-2": [
+      "0-0",
+      "0-7"
+    ],
+    "step-3": [
+      "0-8",
+      "0-10",
+      "0-11",
+      "0-0",
+      "0-9"
+    ],
+    "step-4": [
+      "0-12",
+      "0-13",
+      "0-15",
+      "0-0",
+      "0-1",
+      "0-14"
+    ],
+    "step-5": [
+      "0-12",
+      "0-20",
+      "0-8"
+    ],
+    "step-6": [
+      "0-12",
+      "0-19",
+      "0-21",
+      "0-16",
+      "0-22",
+      "0-24",
+      "0-20",
+      "0-8",
+      "0-1",
+      "0-14",
+      "0-17"
+    ]
+  }
+}

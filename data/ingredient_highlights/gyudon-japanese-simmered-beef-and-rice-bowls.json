@@ -1,0 +1,59 @@
+{
+  "id": "gyudon-japanese-simmered-beef-and-rice-bowls",
+  "title": "Gyudon (Japanese Simmered Beef and Rice Bowls)",
+  "sourceUrl": "https://www.seriouseats.com/gyudon-japanese-simmered-beef-and-rice-bowl-recipe",
+  "ingredients": [
+    {
+      "section": "",
+      "items": [
+        "1 small onion, slivered (about 4 ounces; 120g)",
+        "1/2 cup (120ml) homemade dashi, or the equivalent in Hondashi (see note)",
+        "1/4 cup (60ml) dry sake",
+        "2 tablespoons (30ml) soy sauce",
+        "1 tablespoon (12g) sugar, plus more to taste",
+        "1/2 pound (225g) thinly shaved beef ribeye or chuck steak (see note)",
+        "1 teaspoon (5ml) grated fresh ginger",
+        "Salt",
+        "2 cups cooked white rice",
+        "2 poached eggs (optional)",
+        "Sliced scallions",
+        "Beni-shoga (see note)",
+        "Togarashi (see note)"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "section": "",
+      "steps": [
+        "Combine onion, dashi, sake, soy sauce, and sugar in a medium saucepan or saucier and bring to a simmer over medium heat. Cook, stirring occasionally, until onion is softened, about 5 minutes.",
+        "Add beef and cook, stirring until beef is cooked through and liquid has reduced down to an intensely flavored broth, about 5 minutes. Stir in ginger and simmer for 1 minute longer. Adjust seasoning with salt and sugar to taste.",
+        "Divide rice between 2 to 3 bowls and top with beef and sauce mixture. Garnish each bowl with a poached egg (if using), sliced scallions, beni-shoga, and togarashi. Serve immediately."
+      ]
+    }
+  ],
+  "expectedMatches": {
+    "step-0": [
+      "0-3",
+      "0-10",
+      "0-2",
+      "0-0",
+      "0-4"
+    ],
+    "step-1": [
+      "0-4",
+      "0-6",
+      "0-7",
+      "0-8"
+    ],
+    "step-2": [
+      "0-9",
+      "0-10",
+      "0-11",
+      "0-12",
+      "0-3",
+      "0-8",
+      "0-0"
+    ]
+  }
+}

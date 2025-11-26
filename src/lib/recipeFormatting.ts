@@ -57,6 +57,7 @@ function isGenericHeader(text: string, genericList: string[]): boolean {
 
 type IngredientNormalizationOptions = {
   enableAiConversions?: boolean
+  skipConversions?: boolean
 }
 
 export async function normalizeIngredientSections(
@@ -64,6 +65,7 @@ export async function normalizeIngredientSections(
   options?: IngredientNormalizationOptions
 ) {
   const enableAi = options?.enableAiConversions ?? true
+  const skipConversions = options?.skipConversions ?? false
   const aiCache: Map<string, MetricConversion> | undefined = enableAi
     ? new Map()
     : undefined
@@ -85,7 +87,9 @@ export async function normalizeIngredientSections(
         continue
       }
 
-      const converted = enableAi
+      const converted = skipConversions
+        ? trimmedItem
+        : enableAi
         ? await appendMetricMeasurementWithAI(trimmedItem, { cache: aiCache })
         : appendMetricMeasurement(trimmedItem)
 
@@ -150,4 +154,3 @@ export function formatMetadataForNotes(
 
   return Object.keys(metadata).length > 0 ? JSON.stringify(metadata, null, 2) : ''
 }
-
