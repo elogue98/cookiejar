@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 interface ImageModalProps {
   imageUrl: string
@@ -11,6 +12,8 @@ interface ImageModalProps {
 }
 
 export default function ImageModal({ imageUrl, alt, isOpen, onClose }: ImageModalProps) {
+  const portalRoot = typeof document !== 'undefined' ? document.body : null
+
   // Handle Escape key press
   useEffect(() => {
     if (!isOpen) return
@@ -31,9 +34,9 @@ export default function ImageModal({ imageUrl, alt, isOpen, onClose }: ImageModa
     }
   }, [isOpen, onClose])
 
-  if (!isOpen) return null
+  if (!isOpen || !portalRoot) return null
 
-  return (
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -104,6 +107,7 @@ export default function ImageModal({ imageUrl, alt, isOpen, onClose }: ImageModa
           ✕
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
