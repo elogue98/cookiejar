@@ -51,11 +51,27 @@ const RecipeExtractionSchema = z.object({
 type RecipeExtraction = z.infer<typeof RecipeExtractionSchema>
 
 /**
+ * Normalize MIME types to what OpenAI expects.
+ * Some devices (especially browsers on iOS) report "image/jpg" which
+ * OpenAI rejects with "The string did not match the expected pattern."
+ */
+function normalizeMimeType(mimeType: string | undefined | null): string {
+  const type = (mimeType || '').toLowerCase()
+  if (type === 'image/jpg' || type === 'image/pjpeg') return 'image/jpeg'
+  if (type === 'image/png') return 'image/png'
+  if (type === 'image/webp') return 'image/webp'
+  if (type === 'image/jpeg') return 'image/jpeg'
+  // Fallback to jpeg if something unexpected gets through validation
+  return 'image/jpeg'
+}
+
+/**
  * Extract OCR text from image using OpenAI Vision
  */
 async function extractOCRTextFromImage(imageBuffer: Buffer, mimeType: string): Promise<string> {
+  const normalizedMimeType = normalizeMimeType(mimeType)
   const base64Image = imageBuffer.toString('base64')
-  const dataUrl = `data:${mimeType};base64,${base64Image}`
+  const dataUrl = `data:${normalizedMimeType};base64,${base64Image}`
 
   const model = process.env.OPENAI_MODEL || 'gpt-4o-mini'
   
@@ -320,6 +336,9 @@ export async function POST(req: Request) {
       )
     }
 
+    // Normalize MIME type for downstream services (OpenAI expects image/jpeg not image/jpg)
+    const normalizedMimeType = normalizeMimeType(file.type)
+
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
@@ -327,7 +346,7 @@ export async function POST(req: Request) {
     // Step 1: Extract OCR text from image
     let ocrText: string
     try {
-      ocrText = await extractOCRTextFromImage(buffer, file.type)
+      ocrText = await extractOCRTextFromImage(buffer, normalizedMimeType)
     } catch (error) {
       console.error('Error extracting OCR text from image:', error)
       return NextResponse.json(
@@ -374,7 +393,7 @@ export async function POST(req: Request) {
 
     // Convert image buffer to base64 for preview
     const base64Image = buffer.toString('base64')
-    const imageDataUrl = `data:${file.type};base64,${base64Image}`
+    const imageDataUrl = `data:${normalizedMimeType};base64,${base64Image}`
 
     // Return extracted data for preview (don't create recipe yet)
     return NextResponse.json(
@@ -388,7 +407,7 @@ export async function POST(req: Request) {
           metadataNotes, // Include metadata JSON string (legacy)
           imageDataUrl: imageDataUrl,
           imageBuffer: base64Image,
-          imageMimeType: file.type,
+          imageMimeType: normalizedMimeType,
           ingredientSections,
           instructionSections,
           // Include structured metadata fields
