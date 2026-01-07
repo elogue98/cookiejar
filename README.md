@@ -31,9 +31,11 @@ SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 OPENAI_API_KEY=your-openai-key
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_MODEL_FALLBACK=gpt-4o
+GOOGLE_MAPS_API_KEY=your-google-maps-api-key
+NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY=your-google-maps-embed-key
 ```
 
-These values are required because the frontend talks directly to Supabase and the backend API routes call OpenAI for recipe imports and tagging.
+The Supabase keys power storage/auth, OpenAI is used for recipe imports/tagging, `GOOGLE_MAPS_API_KEY` is required for the Tip Jar Google Maps importer (enable the Places API), and `NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY` is required for the Tip Jar map view (enable Maps Embed API).
 
 ## Learn More
 

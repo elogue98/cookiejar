@@ -3,11 +3,79 @@ import { createServerClient } from '@/lib/supabaseClient'
 import { saveRecipeVersion } from '@/lib/saveRecipeVersion'
 import type { Json } from '@/types/json'
 
+// Minimal UUID v4 validator to guard incoming IDs
+const isUuid = (value: string | undefined | null): boolean => {
+  if (!value) return false
+  const trimmed = value.trim()
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    trimmed
+  )
+}
+
 type IngredientGroup = { section: string; items: string[] }
 type InstructionGroup = { section: string; steps: string[] }
 
 type IngredientValue = IngredientGroup[] | string[] | string | null | undefined
 type InstructionValue = InstructionGroup[] | string | null | undefined
+
+/**
+ * GET /api/recipes/[id]
+ *
+ * Fetch a single recipe by id using the service role client (bypasses RLS).
+ */
+export async function GET(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    // Defensive: derive id from path if params are missing/undefined
+    const pathId =
+      (params && typeof params.id === 'string' && params.id) ||
+      new URL(req.url).pathname.split('/').filter(Boolean).pop()
+
+    if (!pathId) {
+      return NextResponse.json(
+        { success: false, error: 'Missing recipe id', details: { params } },
+        { status: 400 }
+      )
+    }
+
+    const supabase = createServerClient()
+
+    const { data, error } = await supabase
+      .from('recipes')
+      .select('*')
+      .eq('id', pathId)
+      .single()
+
+    if (error || !data) {
+      console.error('Supabase recipe fetch error', { error, params, pathId })
+      return NextResponse.json(
+        {
+          success: false,
+          error: error?.message || 'Recipe not found',
+          code: error?.code,
+          details: error?.details || null,
+          hint: error?.hint || null,
+          pathId,
+        },
+        { status: error?.code === 'PGRST116' ? 404 : 500 }
+      )
+    }
+
+    return NextResponse.json({ success: true, data }, { status: 200 })
+  } catch (error) {
+    console.error('Error fetching recipe:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unexpected error fetching recipe',
+        details: error instanceof Error ? error.stack : error,
+      },
+      { status: 500 }
+    )
+  }
+}
 
 /**
  * Generate a detailed description of ingredient changes
@@ -173,10 +241,20 @@ function generateInstructionChangeDescription(
  */
 export async function PUT(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id?: string } }
 ) {
   try {
-    const { id } = await params
+    // Derive id defensively from params or path
+    const paramId = params?.id
+    const pathId = new URL(req.url).pathname.split('/').filter(Boolean).pop()
+    const id = (paramId || pathId || '').trim()
+
+    if (!isUuid(id)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid recipe id', details: { params, pathId } },
+        { status: 400 }
+      )
+    }
     
     // Parse request body
     const body = await req.json()

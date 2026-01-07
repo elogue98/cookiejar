@@ -6,10 +6,25 @@
   --accent-gold: #DDC57A;
   --accent-clay: #CE7E5A;
   --bg-main: #FAFAF8;
+  --bg-card: #FFFFFF;
   --text-main: #2B2B2B;
+  --text-muted: #6B7280;
+  --border-color: rgba(211, 78, 78, 0.15);
   --radius-lg: 20px;
   --radius-md: 14px;
   --radius-sm: 10px;
+}
+
+[data-theme='tipjar'] {
+  --primary: #3B82F6; /* Blue-500 */
+  --accent-light: #1E3A5F; /* Dark navy */
+  --accent-gold: #60A5FA; /* Blue-400 */
+  --accent-clay: #2563EB; /* Blue-600 */
+  --bg-main: #0C1222; /* Very dark navy */
+  --bg-card: #162032; /* Dark navy card */
+  --text-main: #F1F5F9; /* Slate-100 */
+  --text-muted: #94A3B8; /* Slate-400 */
+  --border-color: rgba(59, 130, 246, 0.2);
 }
 
 @theme inline {
@@ -19,28 +34,29 @@
 }
 
 html {
-  color-scheme: light !important;
-  background: var(--bg-main) !important;
-  color: var(--text-main) !important;
+  color-scheme: light;
+  background: var(--bg-main);
+  color: var(--text-main);
 }
 
 body {
-  background: var(--bg-main) !important;
-  color: var(--text-main) !important;
+  background: var(--bg-main);
+  color: var(--text-main);
   font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Force light mode - override any dark mode media queries */
 @media (prefers-color-scheme: dark) {
   html {
-    color-scheme: light !important;
-    background: var(--bg-main) !important;
-    color: var(--text-main) !important;
+    color-scheme: light;
+    background: var(--bg-main);
+    color: var(--text-main);
   }
   
   body {
-    background: var(--bg-main) !important;
-    color: var(--text-main) !important;
+    background: var(--bg-main);
+    color: var(--text-main);
   }
 }
 

@@ -1,24 +1,39 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
+import { useParams, usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabase } from '@/lib/supabaseClient'
 import { useUser } from '@/lib/userContext'
 import Navigation from '@/app/components/Navigation'
 import type { IngredientGroup, InstructionGroup } from '@/types/recipe'
 
 export default function StructuredEditPage() {
-  const params = useParams()
   const router = useRouter()
+  const params = useParams<{ id?: string }>()
+  const pathname = usePathname()
   const { user } = useUser()
-  const id = params.id as string
+
+  // Prefer params, but fall back to path parsing in case params is undefined
+  const id = useMemo(() => {
+    const paramId = params?.id
+    if (paramId && paramId !== 'undefined') return paramId
+    if (pathname) {
+      const parts = pathname.split('/').filter(Boolean)
+      // /recipes/[id]/edit -> ['recipes', '{id}', 'edit']
+      if (parts.length >= 3 && parts[0] === 'recipes') {
+        return parts[1]
+      }
+    }
+    return ''
+  }, [params?.id, pathname])
 
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [activeTab, setActiveTab] = useState<'details' | 'ingredients' | 'instructions'>('details')
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Form state
   const [title, setTitle] = useState('')
@@ -39,19 +54,42 @@ export default function StructuredEditPage() {
 
   // Fetch recipe
   useEffect(() => {
-    async function fetchRecipe() {
-      try {
-        const { data, error } = await supabase
-          .from('recipes')
-          .select('*')
-          .eq('id', id)
-          .single()
+    let isCancelled = false
 
-        if (error || !data) throw new Error('Recipe not found')
+    async function fetchRecipe() {
+      // If no id, surface an error so we don't stay stuck on loading
+      if (!id) {
+        setError('Missing recipe id')
+        setLoading(false)
+        return
+      }
+
+      try {
+        console.log('edit page: fetching recipe', id)
+        const res = await fetch(`/api/recipes/${id}`, { cache: 'no-store' })
+        const payload = await res.json()
+        console.log('edit page: fetch response', { id, status: res.status, payload })
+
+        if (!res.ok || !payload?.data) {
+          const message =
+            payload?.error ||
+            payload?.details?.message ||
+            `Request failed (${res.status})`
+          if (!isCancelled) {
+            setError(message)
+          }
+          console.error('Recipe fetch failed', { id, status: res.status, payload })
+          return
+        }
+
+        const data = payload.data
+
+        if (isCancelled) return
 
         setTitle(data.title || '')
         setImageUrl(data.image_url || '')
-        
+        setError(null)
+
         // Ingredients parsing
         if (data.ingredients && Array.isArray(data.ingredients)) {
           const list: string[] = []
@@ -108,7 +146,10 @@ export default function StructuredEditPage() {
           }
         }
 
-        setTags(data.tags?.join(', ') || '')
+        const tagValue =
+          Array.isArray(data.tags) ? data.tags.join(', ') : typeof data.tags === 'string' ? data.tags : ''
+
+        setTags(tagValue)
         setSourceUrl(data.source_url || '')
 
         // Metadata - read from proper database columns first
@@ -137,14 +178,24 @@ export default function StructuredEditPage() {
              // Ignore - not JSON
           }
         }
-        
-        setLoading(false)
-      } catch {
-        setLoading(false)
+      } catch (err) {
+        console.error('Error loading recipe:', err)
+        if (!isCancelled) {
+          setError(
+            err instanceof Error && err.message
+              ? err.message
+              : 'Unable to load recipe. Please try again.'
+          )
+        }
+      } finally {
+        if (!isCancelled) setLoading(false)
       }
     }
 
-    if (id) fetchRecipe()
+    fetchRecipe()
+    return () => {
+      isCancelled = true
+    }
   }, [id])
 
   // List handlers
@@ -262,6 +313,11 @@ export default function StructuredEditPage() {
 
   const handleSave = async () => {
     if (!title.trim()) return
+    if (!id) {
+      setError('Missing recipe id')
+      return
+    }
+    setSaveError(null)
     setSaving(true)
 
     // Helper to convert flat list with SECTION markers into structured array
@@ -343,14 +399,55 @@ export default function StructuredEditPage() {
         }),
       })
 
-      if (!res.ok) throw new Error('Failed')
+      const responseBody = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const message =
+          responseBody?.error ||
+          responseBody?.details?.message ||
+          'Failed to save changes'
+        setSaveError(message)
+        throw new Error(message)
+      }
+
+      // On success, return to the recipe detail page
       router.push(`/recipes/${id}`)
-    } catch {
+    } catch (err) {
+      console.error('Error saving recipe:', err)
       setSaving(false)
     }
   }
 
   if (loading) return <div className="p-8 text-center">Loading...</div>
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900">
+        <Navigation />
+        <div className="max-w-3xl mx-auto px-4 py-16 text-center space-y-4">
+          <p className="text-xl font-semibold text-slate-800">We hit a snag loading this recipe.</p>
+          <p className="text-sm text-slate-500">{error}</p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => {
+                setError(null)
+                setLoading(true)
+                router.refresh()
+              }}
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors"
+            >
+              Try again
+            </button>
+            <Link
+              href={id ? `/recipes/${id}` : '/'}
+              className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-slate-100 transition-colors"
+            >
+              Back to recipe
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
@@ -365,13 +462,18 @@ export default function StructuredEditPage() {
             <div className="h-6 w-px bg-slate-200"></div>
             <span className="font-semibold text-slate-700">Edit Recipe</span>
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="bg-blue-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
+          <div className="flex items-center gap-4">
+            {saveError && (
+              <span className="text-sm text-red-600">{saveError}</span>
+            )}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-blue-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-60"
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
         </div>
       </header>
 

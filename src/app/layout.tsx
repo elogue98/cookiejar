@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { UserProvider } from "@/lib/userContext";
+import { ThemeProvider } from "./providers";
 import { Analytics } from "@vercel/analytics/next";
 
 const faviconPath = "/icon.png";
@@ -27,15 +28,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="light" style={{ colorScheme: 'light' }}>
-      <body
-        className="font-sans antialiased"
-        style={{ background: 'var(--bg-main)', color: 'var(--text-main)' }}
-      >
-        <UserProvider>
-          {children}
-          <Analytics />
-        </UserProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className="font-sans antialiased">
+        <ThemeProvider>
+          <UserProvider>
+            {children}
+            <Analytics />
+          </UserProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

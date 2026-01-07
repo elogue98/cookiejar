@@ -10,7 +10,7 @@ export default function WelcomeLanding() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
-      <Navigation />
+      <Navigation forceTheme="cookie" />
 
       <ImportRecipeModal
         isOpen={isImportModalOpen}

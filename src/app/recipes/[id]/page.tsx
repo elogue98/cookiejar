@@ -380,7 +380,7 @@ let normalizedInstructions: InstructionGroup[] | null = null
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
-      <Navigation />
+      <Navigation forceTheme="cookie" />
 
       <ImportCompletionOverlay
         isOpen={showImportOverlay}

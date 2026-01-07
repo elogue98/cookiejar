@@ -42,6 +42,7 @@ export async function uploadOptimizedImage(
   try {
     // Optimize the image
     const optimizedBuffer = await optimizeImage(imageBuffer)
+    const cacheBuster = Date.now().toString()
     
     // Use optimized filename: recipeId-optimized.jpg
     const optimizedPath = `recipes/${recipeId}-optimized.jpg`
@@ -53,6 +54,8 @@ export async function uploadOptimizedImage(
       .upload(optimizedPath, optimizedBuffer, {
         contentType: 'image/jpeg',
         upsert: true,
+        // Ensure the CDN doesn't keep serving an old version after an upsert
+        cacheControl: '1',
       })
     
     if (uploadError) {
@@ -66,6 +69,9 @@ export async function uploadOptimizedImage(
       .getPublicUrl(optimizedPath)
     
     const optimizedUrl = urlData.publicUrl
+    const cacheSafeUrl = optimizedUrl.includes('?')
+      ? `${optimizedUrl}&v=${cacheBuster}`
+      : `${optimizedUrl}?v=${cacheBuster}`
     
     // Delete original file if it exists and is different from optimized
     if (originalPath && originalPath !== optimizedPath) {
@@ -79,7 +85,8 @@ export async function uploadOptimizedImage(
       }
     }
     
-    return optimizedUrl
+    // Return URL with cache buster so clients fetch the fresh image
+    return cacheSafeUrl
   } catch (error) {
     console.error('Error in uploadOptimizedImage:', error)
     return null
