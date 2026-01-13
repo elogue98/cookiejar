@@ -9,6 +9,9 @@ import { useUser } from '@/lib/userContext'
 type ImportResponse = {
   success: boolean
   error?: string
+  debug?: unknown
+  google_status?: string | null
+  google_error?: string | null
   data?: {
     place: {
       id: string

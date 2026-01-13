@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabaseClient'
 import { saveRecipeVersion } from '@/lib/saveRecipeVersion'
 import type { Json } from '@/types/json'
@@ -24,18 +24,20 @@ type InstructionValue = InstructionGroup[] | string | null | undefined
  * Fetch a single recipe by id using the service role client (bypasses RLS).
  */
 export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const resolvedParams = await params
+
     // Defensive: derive id from path if params are missing/undefined
     const pathId =
-      (params && typeof params.id === 'string' && params.id) ||
+      (resolvedParams && typeof resolvedParams.id === 'string' && resolvedParams.id) ||
       new URL(req.url).pathname.split('/').filter(Boolean).pop()
 
     if (!pathId) {
       return NextResponse.json(
-        { success: false, error: 'Missing recipe id', details: { params } },
+        { success: false, error: 'Missing recipe id', details: { params: resolvedParams } },
         { status: 400 }
       )
     }
@@ -49,7 +51,7 @@ export async function GET(
       .single()
 
     if (error || !data) {
-      console.error('Supabase recipe fetch error', { error, params, pathId })
+      console.error('Supabase recipe fetch error', { error, params: resolvedParams, pathId })
       return NextResponse.json(
         {
           success: false,
@@ -240,18 +242,20 @@ function generateInstructionChangeDescription(
  * Returns: { success: boolean, data?: Recipe, error?: string }
  */
 export async function PUT(
-  req: Request,
-  { params }: { params: { id?: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id?: string }> }
 ) {
   try {
+    const resolvedParams = await params
+
     // Derive id defensively from params or path
-    const paramId = params?.id
+    const paramId = resolvedParams?.id
     const pathId = new URL(req.url).pathname.split('/').filter(Boolean).pop()
     const id = (paramId || pathId || '').trim()
 
     if (!isUuid(id)) {
       return NextResponse.json(
-        { success: false, error: 'Invalid recipe id', details: { params, pathId } },
+        { success: false, error: 'Invalid recipe id', details: { params: resolvedParams, pathId } },
         { status: 400 }
       )
     }

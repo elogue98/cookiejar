@@ -32,7 +32,10 @@ async function resolvePlaceIdByNearby(
       const d = haversineDistance(coords.lat, coords.lng, lat, lng)
       return { place_id: r.place_id, distanceKm: d }
     })
-    .filter((v): v is { place_id: string; distanceKm: number } => Boolean(v) && Boolean(v.place_id))
+    .filter(
+      (v): v is { place_id: string; distanceKm: number } =>
+        v !== null && typeof v.place_id === 'string'
+    )
     .sort((a, b) => a.distanceKm - b.distanceKm)
 
   const candidate = withDistance.find((c) => c.distanceKm <= 5) ?? withDistance[0]
@@ -98,7 +101,7 @@ type PlaceDetailsResult = {
   errorMessage?: string
 }
 
-function isLikelyPlaceId(value: string | null | undefined) {
+function isLikelyPlaceId(value: string | null | undefined): value is string {
   if (!value) return false
   // Prefer canonical IDs starting with Ch
   if (/^Ch[Ii]/.test(value)) return true

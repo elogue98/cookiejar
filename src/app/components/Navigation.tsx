@@ -260,8 +260,6 @@ export default function Navigation({ forceTheme }: { forceTheme?: string }) {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
                 />
               </svg>
             </button>
