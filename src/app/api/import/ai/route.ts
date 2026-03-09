@@ -405,11 +405,11 @@ type RecipeExtraction = z.infer<typeof RecipeExtractionSchema>
  */
 function extractImageFromHTML(html: string, baseUrl: string): string | null {
   const $ = cheerio.load(html)
-  
+
   // Try JSON-LD image first
   const scripts = $('script[type="application/ld+json"]')
   let schemaImageUrl: string | null = null
-  
+
   scripts.each((_, el) => {
     try {
       const jsonData = JSON.parse($(el).html() || '{}')
@@ -427,11 +427,11 @@ function extractImageFromHTML(html: string, baseUrl: string): string | null {
 
     return undefined
   })
-  
+
   if (schemaImageUrl) {
     return schemaImageUrl
   }
-  
+
   // Try og:image meta tag
   const ogImage = $('meta[property="og:image"]').attr('content')
   if (ogImage) {
@@ -441,7 +441,7 @@ function extractImageFromHTML(html: string, baseUrl: string): string | null {
       return null
     }
   }
-  
+
   // Try schema.org image microdata
   const schemaImage = $('[itemprop="image"]').attr('content') || $('[itemprop="image"] img').attr('src')
   if (schemaImage) {
@@ -451,7 +451,7 @@ function extractImageFromHTML(html: string, baseUrl: string): string | null {
       return null
     }
   }
-  
+
   // Fallback to first large image (skip small icons)
   const images = $('img')
   for (let i = 0; i < images.length; i++) {
@@ -459,7 +459,7 @@ function extractImageFromHTML(html: string, baseUrl: string): string | null {
     const src = img.attr('src')
     const width = parseInt(img.attr('width') || '0')
     const height = parseInt(img.attr('height') || '0')
-    
+
     // Skip small images (likely icons)
     if (width > 200 && height > 200 && src) {
       try {
@@ -469,7 +469,7 @@ function extractImageFromHTML(html: string, baseUrl: string): string | null {
       }
     }
   }
-  
+
   // Last resort: first img tag
   const firstImg = $('img').first().attr('src')
   if (firstImg) {
@@ -479,7 +479,7 @@ function extractImageFromHTML(html: string, baseUrl: string): string | null {
       return null
     }
   }
-  
+
   return null
 }
 
@@ -541,7 +541,7 @@ function extractTextFromHTML(html: string): string {
     // Choose the candidate with the most ingredients
     return candidates.reduce((best, current) =>
       !best || current.ingredients.length > best.ingredients.length ? current : best
-    , null as typeof candidates[number] | null)
+      , null as typeof candidates[number] | null)
   }
 
   const ensureArray = (value: unknown): unknown[] => {
@@ -597,16 +597,16 @@ function extractTextFromHTML(html: string): string {
   }
 
   const $ = cheerio.load(html)
-  
+
   // First, extract JSON-LD Recipe schema metadata if present
   const scripts = $('script[type="application/ld+json"]')
   let recipeMetadata: JsonLdRecipe | null = null
-  
+
   scripts.each((_, el) => {
     try {
       const jsonData = JSON.parse($(el).html() || '{}')
       const recipe = findRecipeNode(jsonData)
-      
+
       if (recipe) {
         recipeMetadata = recipe
         return false
@@ -617,7 +617,7 @@ function extractTextFromHTML(html: string): string {
 
     return undefined
   })
-  
+
   // If the page has a compact inline recipe block (like Guardian articles),
   // extract that first to reduce hallucinations.
   const inlineRecipe = detectInlineRecipe($)
@@ -639,7 +639,7 @@ function extractTextFromHTML(html: string): string {
 
     return text.trim()
   }
-  
+
   // Build metadata text from JSON-LD if found
   if (recipeMetadata) {
     const metadata = recipeMetadata as JsonLdRecipe
@@ -650,14 +650,14 @@ function extractTextFromHTML(html: string): string {
     if (metadata.cookTime) metadataParts.push(`Cook Time: ${metadata.cookTime}`)
     if (metadata.totalTime) metadataParts.push(`Total Time: ${metadata.totalTime}`)
     if (metadata.recipeCuisine) {
-      const cuisine = Array.isArray(metadata.recipeCuisine) 
-        ? metadata.recipeCuisine.join(', ') 
+      const cuisine = Array.isArray(metadata.recipeCuisine)
+        ? metadata.recipeCuisine.join(', ')
         : metadata.recipeCuisine
       metadataParts.push(`Cuisine: ${cuisine}`)
     }
     if (metadata.recipeCategory) {
-      const category = Array.isArray(metadata.recipeCategory) 
-        ? metadata.recipeCategory.join(', ') 
+      const category = Array.isArray(metadata.recipeCategory)
+        ? metadata.recipeCategory.join(', ')
         : metadata.recipeCategory
       metadataParts.push(`Category: ${category}`)
     }
@@ -665,7 +665,7 @@ function extractTextFromHTML(html: string): string {
     const nutrition = (metadata.nutrition || metadata.nutritionInformation) as JsonLdNutrition | string | null
     if (nutrition) {
       const nutritionParts: string[] = []
-      
+
       // Handle different schema.org formats
       // Calories can be: calories, calorieContent, or in a NutritionInformation object
       const calories =
@@ -678,7 +678,7 @@ function extractTextFromHTML(html: string): string {
         const calMatch = String(calories).match(/(\d+)/)
         if (calMatch) nutritionParts.push(`Calories: ${calMatch[1]}`)
       }
-      
+
       // Protein
       const protein =
         typeof nutrition === 'object' && nutrition
@@ -688,7 +688,7 @@ function extractTextFromHTML(html: string): string {
         const protMatch = String(protein).match(/([\d.]+)/)
         if (protMatch) nutritionParts.push(`Protein: ${protMatch[1]}g`)
       }
-      
+
       // Fat
       const fat =
         typeof nutrition === 'object' && nutrition
@@ -698,7 +698,7 @@ function extractTextFromHTML(html: string): string {
         const fatMatch = String(fat).match(/([\d.]+)/)
         if (fatMatch) nutritionParts.push(`Fat: ${fatMatch[1]}g`)
       }
-      
+
       // Carbs
       const carbs =
         typeof nutrition === 'object' && nutrition
@@ -708,12 +708,12 @@ function extractTextFromHTML(html: string): string {
         const carbsMatch = String(carbs).match(/([\d.]+)/)
         if (carbsMatch) nutritionParts.push(`Carbs: ${carbsMatch[1]}g`)
       }
-      
+
       if (nutritionParts.length > 0) {
         metadataParts.push(`Nutrition (per serving): ${nutritionParts.join(', ')}`)
       }
     }
-    
+
     if (metadataParts.length > 0) {
       metadataText = '\n\nRECIPE METADATA:\n' + metadataParts.join('\n') + '\n'
     }
@@ -744,7 +744,7 @@ function extractTextFromHTML(html: string): string {
       metadataText += `${metadataText ? '\n' : '\n\n'}STRUCTURED RECIPE DATA:\n${structuredParts.join('\n\n')}\n`
     }
   }
-  
+
   // Also look for nutrition in the page HTML - extract nutrition facts tables
   // Do this BEFORE removing script tags so we can find tables
   const nutritionTables = $('table[class*="nutrition"], .nutrition-facts, [class*="nutrition-info"], [id*="nutrition"], [class*="nutritional"], [data-nutrition]')
@@ -755,13 +755,13 @@ function extractTextFromHTML(html: string): string {
       const protMatch = tableText.match(/protein[:\s]+([\d.]+)\s*g/i)
       const fatMatch = tableText.match(/fat[:\s]+([\d.]+)\s*g/i)
       const carbsMatch = tableText.match(/(?:carb|carbohydrate)[:\s]+([\d.]+)\s*g/i)
-      
+
       const extraParts: string[] = []
       if (calMatch) extraParts.push(`Calories: ${calMatch[1]}`)
       if (protMatch) extraParts.push(`Protein: ${protMatch[1]}g`)
       if (fatMatch) extraParts.push(`Fat: ${fatMatch[1]}g`)
       if (carbsMatch) extraParts.push(`Carbs: ${carbsMatch[1]}g`)
-      
+
       if (extraParts.length > 0) {
         if (!metadataText) {
           metadataText = '\n\nRECIPE METADATA:\n'
@@ -771,18 +771,18 @@ function extractTextFromHTML(html: string): string {
       }
     })
   }
-  
+
   const mainContent = $('main, article, [role="main"], .content, .post-content, .entry-content').first()
   const fallbackRoot = $('body').length > 0 ? $('body') : $.root()
   const rawContentHtml = mainContent.length > 0
     ? mainContent.html() || ''
     : fallbackRoot.html() || html
-  
+
   const $content = cheerio.load(rawContentHtml || '')
-  
+
   $content('script, style, noscript').remove()
   $content('br').replaceWith('\n')
-  
+
   $content('h1, h2, h3, h4, h5, h6').each((_, element) => {
     const headingText = $content(element).text().replace(/\s+/g, ' ').trim()
     if (!headingText) {
@@ -791,7 +791,7 @@ function extractTextFromHTML(html: string): string {
     }
     $content(element).replaceWith(`\n\n=== ${headingText} ===\n`)
   })
-  
+
   const headingLikeSelectors = ['p', 'div', 'section', 'article']
   headingLikeSelectors.forEach((selector) => {
     $content(selector).each((_, el) => {
@@ -815,7 +815,7 @@ function extractTextFromHTML(html: string): string {
       }
     })
   })
-  
+
   const detectListHeading = ($li: cheerio.Cheerio, text: string): string | null => {
     if (!text) return null
     const strongText = $li.find('strong, b').text().replace(/\s+/g, ' ').trim()
@@ -837,7 +837,7 @@ function extractTextFromHTML(html: string): string {
         : ''
     const isOrdered = tagName === 'ol'
     let orderedIndex = 0
-    
+
     $list.children('li').each((_, li) => {
       const $li = $content(li)
       const itemText = $li.text().replace(/\s+/g, ' ').trim()
@@ -853,14 +853,14 @@ function extractTextFromHTML(html: string): string {
       const prefix = isOrdered ? `${orderedIndex}. ` : '- '
       items.push(`${prefix}${itemText}`)
     })
-    
+
     if (items.length > 0) {
       $list.replaceWith(`\n${items.join('\n')}\n`)
     } else {
       $list.remove()
     }
   })
-  
+
   // Convert remaining paragraphs to explicit lines
   $content('p').each((_, paragraph) => {
     const $paragraph = $content(paragraph)
@@ -871,7 +871,7 @@ function extractTextFromHTML(html: string): string {
     }
     $paragraph.replaceWith(`\n${text}\n`)
   })
-  
+
   let text = $content.root().text()
   text = text.replace(/\u00a0/g, ' ')
   text = text.replace(/\r/g, '')
@@ -880,15 +880,15 @@ function extractTextFromHTML(html: string): string {
   text = text.replace(/\n{3,}/g, '\n\n')
   text = text.replace(/[ \t]{2,}/g, ' ')
   text = text.trim()
-  
+
   if (metadataText) {
     text = `${metadataText}${text}`
   }
-  
+
   if (text.length > 8000) {
     text = text.substring(0, 8000) + '...'
   }
-  
+
   return text
 }
 
@@ -1108,7 +1108,7 @@ IMPORTANT:
 HTML Content:
 ${content.substring(0, 8000)}`
     : contentType === 'image_ocr'
-    ? `Extract the recipe from this OCR text extracted from an image. The text may have formatting issues, handwriting artifacts, or screenshot formatting - be flexible and intelligent in parsing.
+      ? `Extract the recipe from this OCR text extracted from an image. The text may have formatting issues, handwriting artifacts, or screenshot formatting - be flexible and intelligent in parsing.
 
 Handle:
 - Handwritten notes with messy formatting
@@ -1145,7 +1145,7 @@ IMPORTANT:
 
 OCR Text:
 ${content.substring(0, 8000)}`
-    : `Extract the recipe from this pasted text content. The text may be from any source: copied recipes, handwritten notes converted to text, screenshots, etc.
+      : `Extract the recipe from this pasted text content. The text may be from any source: copied recipes, handwritten notes converted to text, screenshots, etc.
 
 Handle:
 - Any text format, even if messy or poorly structured
@@ -1209,8 +1209,8 @@ ${content.substring(0, 8000)}`
     parsed = JSON.parse(response)
   } catch (parseError) {
     // Try to extract JSON from markdown code blocks if present
-    const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || 
-                     response.match(/\{[\s\S]*\}/)
+    const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/) ||
+      response.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       try {
         parsed = JSON.parse(jsonMatch[1] || jsonMatch[0])
@@ -1229,7 +1229,7 @@ ${content.substring(0, 8000)}`
 
   // Ensure metadata completeness (servings, times, nutrition)
   const enriched = await ensureMetadataCompleteness(validated, content)
-  
+
   return enriched
 }
 
@@ -1287,7 +1287,7 @@ export async function POST(req: Request) {
       try {
         const response = await fetch(url, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)'
           }
         })
 
@@ -1303,7 +1303,7 @@ export async function POST(req: Request) {
         content = extractTextFromHTML(htmlContent)
         contentSourceType = 'html'
         sourceUrl = url
-        
+
         // Extract image from HTML as fallback (AI might miss it)
         const extractedImageUrl = extractImageFromHTML(htmlContent, url)
         if (extractedImageUrl) {
@@ -1420,7 +1420,7 @@ export async function POST(req: Request) {
 
     // Use sourceUrl from extracted recipe if available, otherwise use provided URL
     const finalSourceUrl = extractedRecipe.sourceUrl || sourceUrl
-    
+
     // Prepare recipe data for Supabase (store structured sections to keep headers)
     const ingredients = await normalizeIngredientSections(
       extractedRecipe.ingredientSections,
@@ -1491,8 +1491,7 @@ export async function POST(req: Request) {
       if (aiMatches) {
         recipeData.expected_matches = aiMatches
         console.log(
-          `[import/ai] expected_matches generated for ${extractedRecipe.title || 'untitled'} (${
-            Object.keys(aiMatches).length
+          `[import/ai] expected_matches generated for ${extractedRecipe.title || 'untitled'} (${Object.keys(aiMatches).length
           } steps)`,
         )
       } else {
@@ -1504,7 +1503,7 @@ export async function POST(req: Request) {
 
     // Insert into Supabase
     const supabase = createServerClient()
-    
+
     // Try to insert with created_by first, fallback without it if column doesn't exist
     let data, error
     if (userId && typeof userId === 'string') {
@@ -1514,10 +1513,10 @@ export async function POST(req: Request) {
         .insert({ ...recipeData, created_by: userId })
         .select()
         .single()
-      
+
       data = result.data
       error = result.error
-      
+
       // If error is about missing column, retry without created_by or expected_matches
       if (
         error &&
@@ -1533,7 +1532,7 @@ export async function POST(req: Request) {
           .insert(fallbackData)
           .select()
           .single()
-        
+
         data = retryResult.data
         error = retryResult.error
       }
@@ -1544,7 +1543,7 @@ export async function POST(req: Request) {
         .insert(recipeData)
         .select()
         .single()
-      
+
       data = result.data
       error = result.error
 
@@ -1559,7 +1558,7 @@ export async function POST(req: Request) {
           .insert(fallbackData)
           .select()
           .single()
-        
+
         data = result.data
         error = result.error
       }
@@ -1575,23 +1574,23 @@ export async function POST(req: Request) {
 
     // Handle image upload
     let finalImageUrl: string | null = null
-    
+
     // Priority: extracted image URL from HTML > AI-extracted image URL > uploaded image file
     const imageUrlToUse = imageUrl || extractedRecipe.image
-    
+
     if (imageUrlToUse && data.id) {
       try {
         // Fetch image from URL
         const imageResponse = await fetch(imageUrlToUse, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)'
           }
         })
 
         if (imageResponse.ok) {
           const imageArrayBuffer = await imageResponse.arrayBuffer()
           const imageBuffer = Buffer.from(imageArrayBuffer)
-          
+
           // Determine extension
           let extension = 'jpg'
           const contentType = imageResponse.headers.get('content-type') || 'image/jpeg'
@@ -1605,7 +1604,7 @@ export async function POST(req: Request) {
             else if (urlLower.includes('.webp')) extension = 'webp'
             else if (urlLower.includes('.gif')) extension = 'gif'
           }
-          
+
           // Upload optimized image
           finalImageUrl = await uploadOptimizedImage(supabase, imageBuffer, data.id, extension)
 
@@ -1639,7 +1638,7 @@ export async function POST(req: Request) {
           else if (imageFile.type.includes('webp')) extension = 'webp'
           else if (imageFile.type.includes('gif')) extension = 'gif'
         }
-        
+
         // Upload optimized image (this will compress and delete original)
         finalImageUrl = await uploadOptimizedImage(supabase, imageBuffer, data.id, extension)
 
