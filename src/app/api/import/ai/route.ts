@@ -367,6 +367,139 @@ function extractWprmStructuredData(html: string): WprmStructuredData | null {
   }
 }
 
+function extractTastyRecipesStructuredData(html: string): WprmStructuredData | null {
+  const $ = cheerio.load(html)
+
+  const ingredientRoot = $('.tasty-recipes-ingredients').first()
+  const instructionRoot = $('.tasty-recipes-instructions').first()
+
+  if (ingredientRoot.length === 0 && instructionRoot.length === 0) {
+    return null
+  }
+
+  const ingredientSections: StructuredListSection[] = []
+  const instructionSections: StructuredInstructionSection[] = []
+
+  const pushIngredientSection = (name: string | null, items: string[]) => {
+    if (items.length === 0) return
+    ingredientSections.push({
+      section: name || undefined,
+      items,
+    })
+  }
+
+  // The ingredients body typically sits in a child div; walk its direct children.
+  // Structure: optional <h3/h4> headings interleaved with <ul>/<ol> lists.
+  const ingredientBody = ingredientRoot.find('> div').filter((_, el) => {
+    return $(el).find('ul, ol').length > 0
+  }).first()
+  const ingredientContainer = ingredientBody.length > 0 ? ingredientBody : ingredientRoot
+
+  if (ingredientContainer.length > 0) {
+    let currentSection: string | null = null
+    let currentItems: string[] = []
+
+    ingredientContainer.children().each((_, el) => {
+      const node = el as cheerio.Element
+      const tag = (node.type === 'tag' ? (node.name || '') : '').toLowerCase()
+      const $el = $(el)
+
+      if (/^h[1-6]$/.test(tag)) {
+        if (currentItems.length > 0) {
+          pushIngredientSection(currentSection, currentItems)
+        }
+        currentSection = normalizeText($el.text()).replace(/[–-]\s*$/, '').trim() || null
+        currentItems = []
+        return
+      }
+
+      if (tag === 'ul' || tag === 'ol') {
+        $el.find('> li').each((__, li) => {
+          const $li = $(li)
+          $li.find('.tr-ingredient-checkbox-container, input, label').remove()
+          const text = normalizeText($li.text())
+          if (text) currentItems.push(text)
+        })
+      }
+    })
+
+    if (currentItems.length > 0) {
+      pushIngredientSection(currentSection, currentItems)
+    }
+  }
+
+  if (instructionRoot.length > 0) {
+    const instructionBody = instructionRoot.find('> div').filter((_, el) => {
+      return $(el).find('ol, ul').length > 0
+    }).first()
+    const instructionContainer = instructionBody.length > 0 ? instructionBody : instructionRoot
+
+    let currentSection: string | null = null
+    let currentSteps: string[] = []
+
+    const flush = () => {
+      if (currentSteps.length > 0) {
+        instructionSections.push({
+          section: currentSection || undefined,
+          steps: currentSteps,
+        })
+      }
+      currentSteps = []
+    }
+
+    instructionContainer.children().each((_, el) => {
+      const node = el as cheerio.Element
+      const tag = (node.type === 'tag' ? (node.name || '') : '').toLowerCase()
+      const $el = $(el)
+
+      if (/^h[1-6]$/.test(tag)) {
+        flush()
+        currentSection = normalizeText($el.text()).replace(/[–-]\s*$/, '').trim() || null
+        return
+      }
+
+      if (tag === 'ol' || tag === 'ul') {
+        $el.find('> li').each((__, li) => {
+          const text = normalizeText($(li).text())
+          if (text) currentSteps.push(text)
+        })
+      }
+    })
+
+    flush()
+  }
+
+  const filteredIngredients = ingredientSections
+    .map((section) => ({
+      section: section.section,
+      items: section.items.filter((item) => !!item),
+    }))
+    .filter((section) => section.items.length > 0)
+
+  const filteredInstructions = instructionSections
+    .map((section) => ({
+      section: section.section,
+      steps: section.steps.filter((step) => !!step),
+    }))
+    .filter((section) => section.steps.length > 0)
+
+  if (filteredIngredients.length === 0 && filteredInstructions.length === 0) {
+    return null
+  }
+
+  return {
+    ingredientSections: filteredIngredients,
+    instructionSections: filteredInstructions,
+  }
+}
+
+function extractPluginStructuredData(html: string): WprmStructuredData | null {
+  return (
+    extractWprmStructuredData(html) ||
+    extractTastyRecipesStructuredData(html)
+  )
+}
+
 /**
  * Zod schema for AI-extracted recipe structure
  */
@@ -1299,7 +1432,7 @@ export async function POST(req: Request) {
         }
 
         const htmlContent = await response.text()
-        wprmStructuredData = extractWprmStructuredData(htmlContent)
+        wprmStructuredData = extractPluginStructuredData(htmlContent)
         content = extractTextFromHTML(htmlContent)
         contentSourceType = 'html'
         sourceUrl = url
@@ -1317,7 +1450,7 @@ export async function POST(req: Request) {
       }
     } else if (html) {
       // Use provided HTML
-      wprmStructuredData = extractWprmStructuredData(html)
+      wprmStructuredData = extractPluginStructuredData(html)
       content = extractTextFromHTML(html)
       contentSourceType = 'html'
     } else if (imageFile) {
