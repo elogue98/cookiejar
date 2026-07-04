@@ -130,6 +130,12 @@ Output format example:
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
+const ensureArray = (value: unknown): unknown[] => {
+  if (Array.isArray(value)) return value
+  if (value === undefined || value === null) return []
+  return [value]
+}
+
 const matchesSchemaType = (value: unknown, target: string): boolean => {
   if (typeof value === 'string') {
     return (
@@ -161,6 +167,13 @@ const findRecipeNode = (data: unknown): JsonLdRecipe | null => {
     const node = data as JsonLdRecipe
     if (matchesSchemaType(node['@type'], 'Recipe')) {
       return node
+    }
+
+    for (const value of Object.values(node)) {
+      const match = findRecipeNode(value)
+      if (match) {
+        return match
+      }
     }
   }
 
@@ -497,6 +510,150 @@ function extractPluginStructuredData(html: string): WprmStructuredData | null {
   return (
     extractWprmStructuredData(html) ||
     extractTastyRecipesStructuredData(html)
+  )
+}
+
+function extractInstructionStepsFromJsonLd(entries: unknown): StructuredInstructionSection[] {
+  const stripStepNumber = (text: string) => text.replace(/^\s*(?:step\s*)?\d+[.)]\s*/i, '').trim()
+  const textToSteps = (text: string): string[] => {
+    const trimmed = text.trim()
+    if (!trimmed) return []
+
+    if (/<[a-z][\s\S]*>/i.test(trimmed)) {
+      const $ = cheerio.load(trimmed)
+      const blockSteps = $('p, li')
+        .map((_, el) => stripStepNumber(normalizeText($(el).text())))
+        .get()
+        .filter(Boolean)
+
+      if (blockSteps.length > 0) {
+        return blockSteps
+      }
+    }
+
+    return trimmed
+      .split(/\r?\n+/)
+      .map((line) => stripStepNumber(normalizeText(line.replace(/<[^>]+>/g, ' '))))
+      .filter(Boolean)
+  }
+
+  const sections: StructuredInstructionSection[] = []
+  let defaultSteps: string[] = []
+
+  const pushDefaultSteps = () => {
+    if (defaultSteps.length > 0) {
+      sections.push({ steps: defaultSteps })
+      defaultSteps = []
+    }
+  }
+
+  const collectSteps = (entry: unknown): string[] => {
+    if (entry === undefined || entry === null) return []
+
+    if (typeof entry === 'string') {
+      return textToSteps(entry)
+    }
+
+    if (!isObject(entry)) return []
+
+    const record = entry as Record<string, unknown>
+    const textCandidate =
+      record['text'] ?? record['description'] ?? record['name'] ?? record['step']
+    const ownSteps =
+      typeof textCandidate === 'string' ? textToSteps(textCandidate) : []
+    const childSteps = ensureArray(record['itemListElement'] ?? record['steps'])
+      .flatMap((child) => collectSteps(child))
+
+    return [...ownSteps, ...childSteps]
+  }
+
+  ensureArray(entries).forEach((entry) => {
+    if (isObject(entry) && matchesSchemaType(entry['@type'], 'HowToSection')) {
+      pushDefaultSteps()
+      const nameCandidate = entry['name'] ?? entry['heading'] ?? entry['section']
+      const sectionName = typeof nameCandidate === 'string' ? normalizeText(nameCandidate) : ''
+      const steps = ensureArray(entry['itemListElement'] ?? entry['steps'])
+        .flatMap((child) => collectSteps(child))
+
+      if (steps.length > 0) {
+        sections.push({
+          section: sectionName || undefined,
+          steps,
+        })
+      }
+      return
+    }
+
+    defaultSteps.push(...collectSteps(entry))
+  })
+
+  pushDefaultSteps()
+  return sections.filter((section) => section.steps.length > 0)
+}
+
+function extractJsonLdStructuredData(html: string): WprmStructuredData | null {
+  const $ = cheerio.load(html)
+  let structuredData: WprmStructuredData | null = null
+
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const jsonData = JSON.parse($(el).html() || '{}')
+      const recipe = findRecipeNode(jsonData)
+      if (!recipe) return undefined
+
+      const ingredientItems = ensureArray(recipe.recipeIngredient)
+        .map((item) => {
+          if (typeof item === 'string') return normalizeText(item)
+          if (isObject(item) && typeof item.text === 'string') return normalizeText(item.text)
+          if (isObject(item) && typeof item.name === 'string') return normalizeText(item.name)
+          return ''
+        })
+        .filter(Boolean)
+
+      const instructionSections = extractInstructionStepsFromJsonLd(recipe.recipeInstructions)
+      const ingredientSections =
+        ingredientItems.length > 0 ? [{ items: ingredientItems }] : []
+
+      if (ingredientSections.length > 0 || instructionSections.length > 0) {
+        structuredData = {
+          ingredientSections,
+          instructionSections,
+        }
+        return false
+      }
+    } catch {
+      // Ignore invalid JSON-LD blocks.
+    }
+
+    return undefined
+  })
+
+  return structuredData
+}
+
+function mergeStructuredRecipeData(
+  primary: WprmStructuredData | null,
+  fallback: WprmStructuredData | null,
+): WprmStructuredData | null {
+  if (!primary) return fallback
+  if (!fallback) return primary
+
+  return {
+    ingredientSections:
+      primary.ingredientSections.length > 0
+        ? primary.ingredientSections
+        : fallback.ingredientSections,
+    instructionSections:
+      primary.instructionSections.length > 0
+        ? primary.instructionSections
+        : fallback.instructionSections,
+  }
+}
+
+export function extractStructuredRecipeDataFromHTML(html: string): WprmStructuredData | null {
+  return mergeStructuredRecipeData(
+    extractPluginStructuredData(html),
+    extractJsonLdStructuredData(html),
   )
 }
 
@@ -1028,7 +1185,11 @@ function extractTextFromHTML(html: string): string {
 /**
  * Extract recipe using GPT-4o Mini with structured prompt
  */
-async function extractRecipeWithAI(content: string, contentType: 'html' | 'text' | 'image_ocr'): Promise<RecipeExtraction> {
+export async function extractRecipeWithAI(
+  content: string,
+  contentType: 'html' | 'text' | 'image_ocr',
+  structuredData: WprmStructuredData | null = null,
+): Promise<RecipeExtraction> {
   const systemPrompt = `You are the CookieJar Recipe AI Assistant. Your job is to take a user-submitted recipe (ingredients + instructions + optional metadata) and normalize it into CookieJar's structured format.
 
 ### RULES:
@@ -1356,9 +1517,24 @@ ${content.substring(0, 8000)}`
   }
 
   // Note: We no longer check for errors here since we allow generating instructions when missing
+  if (!isObject(parsed)) {
+    throw new Error('AI response must be a JSON object')
+  }
+
+  const parsedWithStructuredData = structuredData
+    ? {
+        ...parsed,
+        ...(structuredData.ingredientSections.length > 0
+          ? { ingredientSections: structuredData.ingredientSections }
+          : {}),
+        ...(structuredData.instructionSections.length > 0
+          ? { instructionSections: structuredData.instructionSections }
+          : {}),
+      }
+    : parsed
 
   // Validate with zod schema
-  const validated = RecipeExtractionSchema.parse(parsed)
+  const validated = RecipeExtractionSchema.parse(parsedWithStructuredData)
 
   // Ensure metadata completeness (servings, times, nutrition)
   const enriched = await ensureMetadataCompleteness(validated, content)
@@ -1413,7 +1589,7 @@ export async function POST(req: Request) {
     let sourceUrl: string | null = null
     let imageUrl: string | null = null
     let imageBuffer: Buffer | null = null // Store image buffer for later upload
-    let wprmStructuredData: WprmStructuredData | null = null
+    let structuredRecipeData: WprmStructuredData | null = null
 
     if (url) {
       // Fetch HTML from URL
@@ -1432,7 +1608,7 @@ export async function POST(req: Request) {
         }
 
         const htmlContent = await response.text()
-        wprmStructuredData = extractPluginStructuredData(htmlContent)
+        structuredRecipeData = extractStructuredRecipeDataFromHTML(htmlContent)
         content = extractTextFromHTML(htmlContent)
         contentSourceType = 'html'
         sourceUrl = url
@@ -1450,7 +1626,7 @@ export async function POST(req: Request) {
       }
     } else if (html) {
       // Use provided HTML
-      wprmStructuredData = extractPluginStructuredData(html)
+      structuredRecipeData = extractStructuredRecipeDataFromHTML(html)
       content = extractTextFromHTML(html)
       contentSourceType = 'html'
     } else if (imageFile) {
@@ -1528,7 +1704,7 @@ export async function POST(req: Request) {
     // Extract recipe using AI
     let extractedRecipe: RecipeExtraction
     try {
-      extractedRecipe = await extractRecipeWithAI(content, contentSourceType)
+      extractedRecipe = await extractRecipeWithAI(content, contentSourceType, structuredRecipeData)
     } catch (error) {
       console.error('Error extracting recipe with AI:', error)
       return NextResponse.json(
@@ -1537,13 +1713,13 @@ export async function POST(req: Request) {
       )
     }
 
-    if (wprmStructuredData) {
+    if (structuredRecipeData) {
       const overrides: Partial<RecipeExtraction> = {}
-      if (wprmStructuredData.ingredientSections.length > 0) {
-        overrides.ingredientSections = wprmStructuredData.ingredientSections
+      if (structuredRecipeData.ingredientSections.length > 0) {
+        overrides.ingredientSections = structuredRecipeData.ingredientSections
       }
-      if (wprmStructuredData.instructionSections.length > 0) {
-        overrides.instructionSections = wprmStructuredData.instructionSections
+      if (structuredRecipeData.instructionSections.length > 0) {
+        overrides.instructionSections = structuredRecipeData.instructionSections
       }
 
       if (Object.keys(overrides).length > 0) {
