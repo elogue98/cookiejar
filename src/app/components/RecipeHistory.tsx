@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import AnimatedModal from './AnimatedModal'
 import UserAvatar from './UserAvatar'
 
 interface RecipeVersion {
@@ -28,8 +28,6 @@ export default function RecipeHistory({ recipeId }: RecipeHistoryProps) {
   const [versions, setVersions] = useState<RecipeVersion[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
-  const portalRoot = typeof document !== 'undefined' ? document.body : null
-
   const fetchVersions = async () => {
     setIsLoading(true)
     try {
@@ -57,26 +55,6 @@ export default function RecipeHistory({ recipeId }: RecipeHistoryProps) {
       fetchVersions()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen])
-
-  // Handle Escape key press and body scroll lock
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsOpen(false)
-      }
-    }
-
-    document.addEventListener('keydown', handleEscape)
-    // Prevent body scroll when modal is open
-    document.body.style.overflow = 'hidden'
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape)
-      document.body.style.overflow = 'unset'
-    }
   }, [isOpen])
 
   const formatTimestamp = (timestamp: string) => {
@@ -134,23 +112,24 @@ export default function RecipeHistory({ recipeId }: RecipeHistoryProps) {
       )}
 
       {/* Modal/Drawer */}
-      {isOpen && portalRoot &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
-            onClick={() => setIsOpen(false)}
-          >
-            <div
-              className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
+      <AnimatedModal
+        open={isOpen}
+        onClose={() => setIsOpen(false)}
+        closeOnBackdrop
+        closeOnEscape
+        lockScroll
+        ariaLabelledBy="recipe-history-modal-title"
+        rootClassName="p-4"
+        rootStyle={{ zIndex: 50 }}
+        backdropStyle={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+        panelClassName="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col"
+      >
               {/* Header */}
               <div
                 className="flex items-center justify-between p-6 border-b"
                 style={{ borderColor: 'rgba(211, 78, 78, 0.1)' }}
               >
-                <h2 className="text-2xl font-bold" style={{ color: 'var(--text-main)' }}>
+                <h2 id="recipe-history-modal-title" className="text-2xl font-bold" style={{ color: 'var(--text-main)' }}>
                   Recipe History
                 </h2>
                 <button
@@ -230,10 +209,7 @@ export default function RecipeHistory({ recipeId }: RecipeHistoryProps) {
                   </div>
                 )}
               </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      </AnimatedModal>
     </>
   )
 }

@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/lib/userContext'
+import AnimatedModal from './AnimatedModal'
 import LoadingOverlay from './LoadingOverlay'
 
 type ImportMode = 'url' | 'image' | 'text'
@@ -51,8 +52,6 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
   const [error, setError] = useState<string | null>(null)
   const [finalizing, setFinalizing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  if (!isOpen) return null
 
   const handleUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -304,23 +303,14 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
   return (
     <>
       {(loading || finalizing) && <LoadingOverlay onCancel={handleCancel} />}
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-        }}
-        onClick={handleClose}
-      >
-      <div
-        style={{
+      <AnimatedModal
+        open={isOpen}
+        onClose={handleClose}
+        closeOnBackdrop
+        ariaLabelledBy="import-recipe-modal-title"
+        rootStyle={{ padding: 0, zIndex: 1000 }}
+        backdropStyle={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+        panelStyle={{
           backgroundColor: 'white',
           borderRadius: 'var(--radius-lg)',
           padding: '32px',
@@ -330,11 +320,11 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
           overflow: 'auto',
           boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{ marginBottom: '24px' }}>
           <h2
+            id="import-recipe-modal-title"
             style={{
               fontSize: '24px',
               fontWeight: '600',
@@ -742,9 +732,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
           </form>
         )}
 
-      </div>
-    </div>
+      </AnimatedModal>
     </>
   )
 }
-

@@ -1,8 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import AnimatedModal from './AnimatedModal'
 
 interface ImageModalProps {
   imageUrl: string
@@ -12,59 +11,26 @@ interface ImageModalProps {
 }
 
 export default function ImageModal({ imageUrl, alt, isOpen, onClose }: ImageModalProps) {
-  const portalRoot = typeof document !== 'undefined' ? document.body : null
-
-  // Handle Escape key press
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      }
-    }
-
-    document.addEventListener('keydown', handleEscape)
-    // Prevent body scroll when modal is open
-    document.body.style.overflow = 'hidden'
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape)
-      document.body.style.overflow = 'unset'
-    }
-  }, [isOpen, onClose])
-
-  if (!isOpen || !portalRoot) return null
-
-  return createPortal(
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  return (
+    <AnimatedModal
+      open={isOpen}
+      onClose={onClose}
+      closeOnBackdrop
+      closeOnEscape
+      lockScroll
+      ariaLabel={`Expanded image: ${alt}`}
+      rootStyle={{ padding: 0, zIndex: 1000 }}
+      backdropStyle={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+      panelStyle={{
+        maxWidth: '90vw',
+        maxHeight: '90vh',
+        width: '90vw',
+        height: '90vh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
       }}
-      onClick={onClose}
     >
-      <div
-        style={{
-          position: 'relative',
-          maxWidth: '90vw',
-          maxHeight: '90vh',
-          width: '90vw',
-          height: '90vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
         <Image
           src={imageUrl}
           alt={alt}
@@ -106,8 +72,6 @@ export default function ImageModal({ imageUrl, alt, isOpen, onClose }: ImageModa
         >
           ✕
         </button>
-      </div>
-    </div>,
-    document.body
+    </AnimatedModal>
   )
 }

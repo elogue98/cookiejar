@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import AnimatedModal from './AnimatedModal'
 
 interface ImportCompletionOverlayProps {
   isOpen: boolean
@@ -20,21 +21,28 @@ export default function ImportCompletionOverlay({
 }: ImportCompletionOverlayProps) {
   const router = useRouter()
   const [visible, setVisible] = useState(isOpen)
+  const [shouldNavigateAfterExit, setShouldNavigateAfterExit] = useState(false)
   const [cookbookSource, setCookbookSource] = useState(initialCookbookSource || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setVisible(isOpen)
+    if (isOpen) setShouldNavigateAfterExit(false)
   }, [isOpen])
 
   useEffect(() => {
     setCookbookSource(initialCookbookSource || '')
   }, [initialCookbookSource])
 
-  if (!visible) {
-    return null
+  const closeAndNavigate = () => {
+    setShouldNavigateAfterExit(true)
+    setVisible(false)
   }
+
+  const handleExited = useCallback(() => {
+    if (shouldNavigateAfterExit) router.replace(destinationPath)
+  }, [destinationPath, router, shouldNavigateAfterExit])
 
   const handleFinish = async () => {
     if (saving) return
@@ -44,8 +52,7 @@ export default function ImportCompletionOverlay({
     const initialTrimmed = (initialCookbookSource || '').trim()
 
     if (trimmed === initialTrimmed) {
-      setVisible(false)
-      router.replace(destinationPath)
+      closeAndNavigate()
       return
     }
 
@@ -64,8 +71,7 @@ export default function ImportCompletionOverlay({
         throw new Error(data.error || 'Failed to save cookbook info')
       }
 
-      setVisible(false)
-      router.replace(destinationPath)
+      closeAndNavigate()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save cookbook info')
     } finally {
@@ -74,29 +80,22 @@ export default function ImportCompletionOverlay({
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.35)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '20px',
+    <AnimatedModal
+      open={visible}
+      onExited={handleExited}
+      ariaLabelledBy="import-completion-modal-title"
+      rootStyle={{ padding: '20px', zIndex: 1000 }}
+      backdropStyle={{ backgroundColor: 'rgba(0, 0, 0, 0.35)' }}
+      panelStyle={{
+        backgroundColor: '#fff',
+        borderRadius: '24px',
+        width: '100%',
+        maxWidth: '560px',
+        padding: '40px',
+        boxShadow: '0 30px 80px rgba(0,0,0,0.18)',
+        textAlign: 'center',
       }}
     >
-      <div
-        style={{
-          backgroundColor: '#fff',
-          borderRadius: '24px',
-          width: '100%',
-          maxWidth: '560px',
-          padding: '40px',
-          boxShadow: '0 30px 80px rgba(0,0,0,0.18)',
-          textAlign: 'center',
-        }}
-      >
         <div
           style={{
             width: '72px',
@@ -114,7 +113,7 @@ export default function ImportCompletionOverlay({
           ✓
         </div>
 
-        <h2 style={{ fontSize: '26px', marginBottom: '12px', color: 'var(--text-main)' }}>
+        <h2 id="import-completion-modal-title" style={{ fontSize: '26px', marginBottom: '12px', color: 'var(--text-main)' }}>
           Recipe imported!
         </h2>
         <p style={{ margin: 0, color: 'rgba(43, 43, 43, 0.75)', fontSize: '16px' }}>
@@ -186,8 +185,6 @@ export default function ImportCompletionOverlay({
         >
           {saving ? 'Saving...' : 'Finish import'}
         </button>
-      </div>
-    </div>
+    </AnimatedModal>
   )
 }
-

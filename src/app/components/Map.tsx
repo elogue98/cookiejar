@@ -11,6 +11,11 @@ type PlacesMapProps = {
 }
 
 type LatLng = { lat: number; lng: number }
+type GoogleMapsWindow = Window & {
+  google?: {
+    maps?: typeof google.maps
+  }
+}
 
 const FALLBACK_CENTER: LatLng = { lat: 51.5074, lng: -0.1278 } // London default
 
@@ -28,9 +33,9 @@ function MapContent({ places, selectedPlaceId, onSelect }: PlacesMapProps) {
   useEffect(() => {
     // Only fit bounds if no specific place is selected or if the selected place changes
     if (!map || !geoPlaces.length || typeof window === 'undefined') return
-    const g = (window as any).google
-    if (!g?.maps) return
-    const bounds = new g.maps.LatLngBounds()
+    const googleMaps = (window as GoogleMapsWindow).google?.maps
+    if (!googleMaps) return
+    const bounds = new googleMaps.LatLngBounds()
     geoPlaces.forEach((p) => bounds.extend({ lat: p.latitude!, lng: p.longitude! }))
     map.fitBounds(bounds)
     if (geoPlaces.length === 1) {
@@ -77,7 +82,7 @@ function MapContent({ places, selectedPlaceId, onSelect }: PlacesMapProps) {
             {selectedPlace.notes && (
               <div className="mb-2 p-2 bg-yellow-50 rounded border border-yellow-100">
                 <p className="text-xs text-gray-700 italic">
-                  "{selectedPlace.notes}"
+                  &ldquo;{selectedPlace.notes}&rdquo;
                 </p>
               </div>
             )}
@@ -172,4 +177,3 @@ export default function PlacesMap({ places, selectedPlaceId, onSelect }: PlacesM
     </APIProvider>
   )
 }
-

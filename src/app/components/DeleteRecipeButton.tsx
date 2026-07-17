@@ -1,8 +1,8 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { useState } from 'react'
+import AnimatedModal from './AnimatedModal'
 
 interface DeleteRecipeButtonProps {
   recipeId: string
@@ -14,29 +14,6 @@ export default function DeleteRecipeButton({ recipeId, recipeTitle }: DeleteReci
   const [isDeleting, setIsDeleting] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const portalRoot = typeof document !== 'undefined' ? document.body : null
-
-  // Handle Escape key press
-  useEffect(() => {
-    if (!showConfirmModal) return
-
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowConfirmModal(false)
-        setError(null)
-      }
-    }
-
-    document.addEventListener('keydown', handleEscape)
-    // Prevent body scroll when modal is open
-    document.body.style.overflow = 'hidden'
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape)
-      document.body.style.overflow = 'unset'
-    }
-  }, [showConfirmModal])
-
   const handleDeleteClick = () => {
     setShowConfirmModal(true)
     setError(null)
@@ -88,34 +65,25 @@ export default function DeleteRecipeButton({ recipeId, recipeTitle }: DeleteReci
         Delete Recipe
       </button>
 
-      {showConfirmModal && portalRoot &&
-        createPortal(
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000,
-            }}
-            onClick={handleCancel}
-          >
-            <div
-              style={{
-                backgroundColor: 'white',
-                borderRadius: 'var(--radius-lg)',
-                padding: '32px',
-                maxWidth: '480px',
-                width: '90%',
-                boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
+      <AnimatedModal
+        open={showConfirmModal}
+        onClose={handleCancel}
+        closeOnBackdrop
+        closeOnEscape
+        lockScroll
+        role="alertdialog"
+        ariaLabelledBy="delete-recipe-modal-title"
+        rootStyle={{ padding: 0, zIndex: 1000 }}
+        backdropStyle={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+        panelStyle={{
+          backgroundColor: 'white',
+          borderRadius: 'var(--radius-lg)',
+          padding: '32px',
+          maxWidth: '480px',
+          width: '90%',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+        }}
+      >
               {/* Header */}
               <div style={{ marginBottom: '24px' }}>
                 <div
@@ -133,6 +101,7 @@ export default function DeleteRecipeButton({ recipeId, recipeTitle }: DeleteReci
                   <span style={{ fontSize: '24px' }}>⚠️</span>
                 </div>
                 <h2
+                  id="delete-recipe-modal-title"
                   style={{
                     fontSize: '24px',
                     fontWeight: '600',
@@ -221,10 +190,7 @@ export default function DeleteRecipeButton({ recipeId, recipeTitle }: DeleteReci
                   {isDeleting ? 'Deleting...' : 'Delete Recipe'}
                 </button>
               </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      </AnimatedModal>
     </>
   )
 }
