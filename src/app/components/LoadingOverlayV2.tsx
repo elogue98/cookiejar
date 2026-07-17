@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
+import { shuffle } from '@/lib/shuffle'
 import { LOADING_MESSAGES } from './loadingMessages'
 
 interface LoadingOverlayProps {
@@ -9,7 +10,7 @@ interface LoadingOverlayProps {
 }
 
 export default function LoadingOverlayV2({ onCancel }: LoadingOverlayProps) {
-  const messages = LOADING_MESSAGES
+  const [messages] = useState(() => shuffle(LOADING_MESSAGES))
   const [messageIndex, setMessageIndex] = useState(0)
 
   // Cycle through messages
@@ -49,16 +50,16 @@ export default function LoadingOverlayV2({ onCancel }: LoadingOverlayProps) {
 
       {/* CENTRAL LOADING CARD */}
       <div className="bg-white p-10 rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] flex flex-col items-center max-w-md w-full mx-4 border border-gray-100">
-        
+
         {/* SPINNER CONTAINER */}
         <div className="relative w-32 h-32 mb-8 flex items-center justify-center">
           {/* Rotating Ring */}
           <div className="absolute inset-0 rounded-full border-[3px] border-dashed border-gray-200 animate-[spin_8s_linear_infinite]" />
           <div className="absolute inset-0 rounded-full border-[3px] border-dashed border-transparent border-t-[#D34E4E] animate-[spin_3s_linear_infinite]" />
-          
+
           {/* Static Icon */}
           <div className="relative z-10">
-             <Image
+            <Image
               src="/Logo/frame-1.png"
               alt="Loading"
               width={80}
@@ -71,7 +72,7 @@ export default function LoadingOverlayV2({ onCancel }: LoadingOverlayProps) {
 
         {/* MESSAGE */}
         <div className="h-16 flex items-center justify-center w-full">
-          <p 
+          <p
             key={messageIndex}
             className="text-lg text-gray-700 text-center font-medium animate-[fadeIn_0.5s_ease-out]"
           >
