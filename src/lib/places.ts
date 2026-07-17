@@ -21,8 +21,9 @@ export type Place = {
 }
 
 type RatingRow = { place_id: string; rating: number }
+type SupabaseErrorLike = { message: string }
 
-export async function fetchPlaces(userId?: string) {
+export async function fetchPlaces() {
   const { data, error } = await supabase.from('places').select('*').order('updated_at', { ascending: false })
 
   if (error) {
@@ -34,7 +35,10 @@ export async function fetchPlaces(userId?: string) {
   // Fetch rating aggregates
   const { data: ratingRows, error: ratingsError } = await supabase
     .from('place_ratings')
-    .select('place_id, rating') as unknown as { data: RatingRow[] | null; error: any }
+    .select('place_id, rating') as unknown as {
+      data: RatingRow[] | null
+      error: SupabaseErrorLike | null
+    }
 
   if (ratingsError) {
     console.warn('Could not fetch place ratings (continuing without aggregates):', ratingsError)
@@ -73,4 +77,3 @@ export async function fetchPlace(id: string) {
 
   return data as Place
 }
-

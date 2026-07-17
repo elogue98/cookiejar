@@ -243,7 +243,7 @@ export default function PlacesImportPage() {
             }}
           >
             <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              Paste any Google Maps place URL (e.g. a café or restaurant). We'll resolve the place,
+              Paste any Google Maps place URL (e.g. a café or restaurant). We&apos;ll resolve the place,
               pull its details from Google, and drop it into Tip Jar with auto-tags (cuisine/type).
               Perfect for planning London food crawls or saving coffee spots to try later.
             </p>

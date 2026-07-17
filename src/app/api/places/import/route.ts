@@ -1,62 +1,3 @@
-async function resolvePlaceIdByNearby(
-  keyword: string,
-  apiKey: string,
-  coords?: { lat: number; lng: number } | null
-): Promise<string | null> {
-  if (!coords) return null
-  const url = new URL('https://maps.googleapis.com/maps/api/place/nearbysearch/json')
-  url.searchParams.set('location', `${coords.lat},${coords.lng}`)
-  url.searchParams.set('rankby', 'distance')
-  url.searchParams.set('keyword', keyword)
-  url.searchParams.set('key', apiKey)
-  url.searchParams.set('region', 'gb')
-  url.searchParams.set('language', 'en')
-
-  const response = await fetch(url.toString())
-  if (!response.ok) {
-    console.error('Nearby search HTTP error', response.status, response.statusText)
-    return null
-  }
-  const payload = (await response.json()) as GoogleTextSearchResponse
-  if (payload.status !== 'OK' || !payload.results?.length) {
-    console.error('Nearby search failed', payload.status, payload.error_message)
-    return null
-  }
-
-  // Pick the closest within 5km to avoid cross-city mismatches.
-  const withDistance = payload.results
-    .map((r) => {
-      const lat = (r as any).geometry?.location?.lat
-      const lng = (r as any).geometry?.location?.lng
-      if (typeof lat !== 'number' || typeof lng !== 'number') return null
-      const d = haversineDistance(coords.lat, coords.lng, lat, lng)
-      return { place_id: r.place_id, distanceKm: d }
-    })
-    .filter(
-      (v): v is { place_id: string; distanceKm: number } =>
-        v !== null && typeof v.place_id === 'string'
-    )
-    .sort((a, b) => a.distanceKm - b.distanceKm)
-
-  const candidate = withDistance.find((c) => c.distanceKm <= 5) ?? withDistance[0]
-  if (!candidate) {
-    console.error('Nearby search had results but none with coords/place_id')
-    return null
-  }
-  return candidate.place_id
-}
-
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const toRad = (deg: number) => (deg * Math.PI) / 180
-  const R = 6371 // km
-  const dLat = toRad(lat2 - lat1)
-  const dLon = toRad(lon2 - lon1)
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
-}
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient } from '@/lib/supabaseClient'
@@ -72,7 +13,10 @@ const requestSchema = z.object({
   url: z.string().url(),
 })
 
-type GoogleTextSearchResult = { place_id: string }
+type GoogleTextSearchResult = {
+  place_id: string
+  geometry?: { location?: { lat?: number; lng?: number } }
+}
 type GoogleTextSearchResponse = {
   status: string
   results?: GoogleTextSearchResult[]
@@ -269,23 +213,6 @@ export async function POST(req: Request) {
     const normalizedPlace = normalizePlaceDetails(placeDetails.place, url, 'unrated', cuisineTags)
 
     const {
-      data: existingPlace,
-      error: existingPlaceError,
-    } = await supabase
-      .from('places')
-      .select('*')
-      .eq('google_place_id', resolvedPlaceId)
-      .maybeSingle()
-
-    if (existingPlaceError) {
-      console.error('Failed to look up existing place', existingPlaceError)
-      return NextResponse.json(
-        { success: false, error: 'Could not check for existing place' },
-        { status: 500 }
-      )
-    }
-
-    const {
       data: upsertedPlace,
       error: upsertError,
     } = await supabase
@@ -353,6 +280,66 @@ async function resolvePlaceIdByText(
   }
 
   return payload.results[0].place_id
+}
+
+async function resolvePlaceIdByNearby(
+  keyword: string,
+  apiKey: string,
+  coords?: { lat: number; lng: number } | null
+): Promise<string | null> {
+  if (!coords) return null
+  const url = new URL('https://maps.googleapis.com/maps/api/place/nearbysearch/json')
+  url.searchParams.set('location', `${coords.lat},${coords.lng}`)
+  url.searchParams.set('rankby', 'distance')
+  url.searchParams.set('keyword', keyword)
+  url.searchParams.set('key', apiKey)
+  url.searchParams.set('region', 'gb')
+  url.searchParams.set('language', 'en')
+
+  const response = await fetch(url.toString())
+  if (!response.ok) {
+    console.error('Nearby search HTTP error', response.status, response.statusText)
+    return null
+  }
+  const payload = (await response.json()) as GoogleTextSearchResponse
+  if (payload.status !== 'OK' || !payload.results?.length) {
+    console.error('Nearby search failed', payload.status, payload.error_message)
+    return null
+  }
+
+  // Pick the closest within 5km to avoid cross-city mismatches.
+  const withDistance = payload.results
+    .map((result) => {
+      const lat = result.geometry?.location?.lat
+      const lng = result.geometry?.location?.lng
+      if (typeof lat !== 'number' || typeof lng !== 'number') return null
+      const distanceKm = haversineDistance(coords.lat, coords.lng, lat, lng)
+      return { place_id: result.place_id, distanceKm }
+    })
+    .filter(
+      (value): value is { place_id: string; distanceKm: number } =>
+        value !== null && typeof value.place_id === 'string'
+    )
+    .sort((a, b) => a.distanceKm - b.distanceKm)
+
+  const candidate = withDistance.find((c) => c.distanceKm <= 5) ?? withDistance[0]
+  if (!candidate) {
+    console.error('Nearby search had results but none with coords/place_id')
+    return null
+  }
+  return candidate.place_id
+}
+
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const R = 6371 // km
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
 }
 
 async function fetchPlaceDetails(placeId: string, apiKey: string): Promise<PlaceDetailsResult> {
@@ -457,5 +444,3 @@ function isShortMapsUrl(url: string) {
     return false
   }
 }
-
-

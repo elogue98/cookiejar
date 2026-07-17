@@ -1,12 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { POST } from './route'
 
-const fetchMock = vi.fn()
+type PlaceInsert = {
+  google_place_id: string
+  name: string
+  address: string
+  latitude: number | null
+  longitude: number | null
+  url: string | null
+  website: string | null
+  status: string
+  cuisine_tags: string[]
+}
+
+type SavedPlace = PlaceInsert & { id: string }
+
+const fetchMock = vi.fn<typeof fetch>()
 const supabaseMock = createSupabaseDouble()
 
 vi.stubGlobal('fetch', fetchMock)
 vi.mock('@/lib/supabaseClient', () => ({
   createServerClient: () => supabaseMock,
+}))
+vi.mock('@/lib/placeTagging', () => ({
+  generateTagsForPlace: vi.fn().mockResolvedValue(['coffee']),
 }))
 
 describe('POST /api/places/import', () => {
@@ -17,25 +34,30 @@ describe('POST /api/places/import', () => {
   })
 
   it('imports a place via text search when place_id is missing', async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ status: 'OK', results: [{ place_id: 'abc123' }] }),
-    })
+    const placeId = 'ChIJabc1234'
+    fetchMock.mockImplementation(async (input) => {
+      const url = requestUrl(input)
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        status: 'OK',
-        result: {
-          place_id: 'abc123',
-          name: 'Test Cafe',
-          formatted_address: '1 Street, London',
-          geometry: { location: { lat: 51.5, lng: -0.1 } },
-          url: 'https://maps.google.com/?q=test',
-          website: 'https://test.cafe',
-          types: ['cafe'],
-        },
-      }),
+      if (url.pathname.endsWith('/textsearch/json')) {
+        return googleResponse({ status: 'OK', results: [{ place_id: placeId }] })
+      }
+
+      if (url.pathname.endsWith('/details/json')) {
+        return googleResponse({
+          status: 'OK',
+          result: {
+            place_id: placeId,
+            name: 'Test Cafe',
+            formatted_address: '1 Street, London',
+            geometry: { location: { lat: 51.5, lng: -0.1 } },
+            url: 'https://maps.google.com/?q=test',
+            website: 'https://test.cafe',
+            types: ['cafe'],
+          },
+        })
+      }
+
+      throw new Error(`Unexpected fetch ${url.toString()}`)
     })
 
     const request = new Request('http://localhost/api/places/import', {
@@ -50,30 +72,58 @@ describe('POST /api/places/import', () => {
     const json = await response.json()
 
     expect(json.success).toBe(true)
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(supabaseMock.upsertedPlaces[0].status).toBe('unrated')
+    expect(fetchedPathnames()).toEqual([
+      '/maps/api/place/textsearch/json',
+      '/maps/api/place/details/json',
+    ])
+    expect(supabaseMock.upsertedPlaces[0]).toMatchObject({
+      google_place_id: placeId,
+      name: 'Test Cafe',
+      status: 'unrated',
+      cuisine_tags: ['cafe', 'coffee'],
+    })
+    expect(supabaseMock.placeLookups).toBe(0)
   })
 
   it('expands maps.app.goo.gl short links', async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      url: 'https://www.google.com/maps/place/Flat+White+Coffee/@51.5,-0.1,17z/data=!3m1!4b1!4m6!3m5!1sChIJxyz987!8m2!3d51.5!4d-0.1!16s%2Fg%2F11abcd',
-      json: async () => ({}),
-    })
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        status: 'OK',
-        result: {
-          place_id: 'ChIJxyz987',
-          name: 'Flat White Coffee',
-          formatted_address: '1 Street, London',
-          geometry: { location: { lat: 51.5, lng: -0.1 } },
-          url: 'https://maps.google.com/?q=flatwhite',
-          website: null,
-          types: ['cafe'],
-        },
-      }),
+    const placeId = 'ChIJxyz987'
+    const expandedUrl =
+      'https://www.google.com/maps/place/Flat+White+Coffee/@51.5,-0.1,17z/data=!3m1!4b1!4m6!3m5!1sChIJxyz987!8m2!3d51.5!4d-0.1!16s%2Fg%2F11abcd'
+    fetchMock.mockImplementation(async (input) => {
+      const url = requestUrl(input)
+
+      if (url.hostname === 'maps.app.goo.gl') {
+        return googleResponse({}, expandedUrl)
+      }
+
+      if (url.pathname.endsWith('/nearbysearch/json')) {
+        return googleResponse({
+          status: 'OK',
+          results: [
+            {
+              place_id: placeId,
+              geometry: { location: { lat: 51.5, lng: -0.1 } },
+            },
+          ],
+        })
+      }
+
+      if (url.pathname.endsWith('/details/json')) {
+        return googleResponse({
+          status: 'OK',
+          result: {
+            place_id: placeId,
+            name: 'Flat White Coffee',
+            formatted_address: '1 Street, London',
+            geometry: { location: { lat: 51.5, lng: -0.1 } },
+            url: 'https://maps.google.com/?q=flatwhite',
+            website: null,
+            types: ['cafe'],
+          },
+        })
+      }
+
+      throw new Error(`Unexpected fetch ${url.toString()}`)
     })
 
     const request = new Request('http://localhost/api/places/import', {
@@ -88,32 +138,49 @@ describe('POST /api/places/import', () => {
     const json = await response.json()
 
     expect(json.success).toBe(true)
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(supabaseMock.upsertedPlaces[0].google_place_id).toBe('ChIJxyz987')
+    expect(fetchedPathnames()).toEqual([
+      '/short123',
+      '/maps/api/place/details/json',
+      '/maps/api/place/nearbysearch/json',
+    ])
+    expect(supabaseMock.upsertedPlaces[0]).toMatchObject({
+      google_place_id: placeId,
+      name: 'Flat White Coffee',
+      status: 'unrated',
+    })
+    expect(supabaseMock.placeLookups).toBe(0)
   })
 })
 
 function createSupabaseDouble() {
   const state = {
-    upsertedPlaces: [] as any[],
+    placeLookups: 0,
+    upsertedPlaces: [] as SavedPlace[],
   }
 
   return {
+    get placeLookups() {
+      return state.placeLookups
+    },
     get upsertedPlaces() {
       return state.upsertedPlaces
     },
     reset() {
+      state.placeLookups = 0
       state.upsertedPlaces = []
     },
     from(table: string) {
       if (table === 'places') {
         return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({ data: null, error: null }),
-            }),
-          }),
-          upsert: (rows: any[]) => {
+          select: () => {
+            state.placeLookups += 1
+            return {
+              eq: () => ({
+                maybeSingle: async () => ({ data: null, error: null }),
+              }),
+            }
+          },
+          upsert: (rows: PlaceInsert[]) => {
             const record = { id: `place-${state.upsertedPlaces.length + 1}`, ...rows[0] }
             state.upsertedPlaces.push(record)
             return {
@@ -130,4 +197,22 @@ function createSupabaseDouble() {
   }
 }
 
+function requestUrl(input: Parameters<typeof fetch>[0]) {
+  if (typeof input === 'string') return new URL(input)
+  if (input instanceof URL) return input
+  return new URL(input.url)
+}
 
+function googleResponse(body: unknown, url = '') {
+  return {
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    url,
+    json: async () => body,
+  } as Response
+}
+
+function fetchedPathnames() {
+  return fetchMock.mock.calls.map(([input]) => requestUrl(input).pathname)
+}

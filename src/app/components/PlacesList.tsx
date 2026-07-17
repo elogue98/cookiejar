@@ -94,10 +94,6 @@ export default function PlacesList() {
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     })
 
-  const selectedPlace = selectedPlaceId
-    ? places.find((p) => p.id === selectedPlaceId)
-    : null
-
   const handleRated = (placeId: string, average: number | null, total: number) => {
     setPlaces((prev) =>
       prev.map((p) =>

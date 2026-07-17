@@ -117,16 +117,6 @@ export default function PlaceStarRating({ placeId, initialAverage, onRated }: Pl
     return user ? 'Click a star to rate this place' : 'Log in to rate this place'
   }
 
-  const handleRatingInput = async (newValue: string) => {
-    // Only allow update if valid number between 1-10
-    const rating = parseFloat(newValue)
-    if (isNaN(rating) || rating < 1 || rating > 10) return
-
-    // Round to 1 decimal place
-    const rounded = Math.round(rating * 10) / 10
-    handleStarClick(rounded)
-  }
-
   return (
     <div className="flex items-center gap-0.5" title={getTooltipText()}>
       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((starValue) => {
@@ -163,5 +153,4 @@ export default function PlaceStarRating({ placeId, initialAverage, onRated }: Pl
     </div>
   )
 }
-
 
