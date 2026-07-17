@@ -5,7 +5,6 @@ import type { Recipe } from '@/types/recipe'
 import Navigation from '@/app/components/Navigation'
 import RecipeList from '@/app/components/RecipeList'
 import WelcomeLanding from '@/app/components/WelcomeLanding'
-import { useEffect, useState } from 'react'
 
 interface HomePageContentProps {
   recipes: Recipe[]
@@ -15,12 +14,6 @@ interface HomePageContentProps {
 
 export default function HomePageContent({ recipes, errorMessage, errorHint }: HomePageContentProps) {
   const { user, isLoading } = useUser()
-  const [mounted, setMounted] = useState(false)
-
-  // Avoid hydration mismatch by waiting for mount
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   if (isLoading) {
     return (
@@ -49,9 +42,6 @@ export default function HomePageContent({ recipes, errorMessage, errorHint }: Ho
   if (!user) {
     return <WelcomeLanding />
   }
-
-  // Prevent flash of incorrect theme content
-  if (!mounted) return null
 
   return (
     <div 
