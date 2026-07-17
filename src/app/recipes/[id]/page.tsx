@@ -13,6 +13,7 @@ import RecipeHistory from '@/app/components/RecipeHistory'
 import RecipeInteractionWrapper from '@/app/components/RecipeInteractionWrapper'
 import ImportCompletionOverlay from '@/app/components/ImportCompletionOverlay'
 import type { IngredientGroup, InstructionGroup, Recipe } from '@/types/recipe'
+import { formatRecipeTime } from '@/lib/recipeTime'
 
 // Helper functions
 function getDomain(url: string): string {
@@ -71,12 +72,6 @@ function cleanSectionHeader(raw: string): string {
     .replace(/:\s*$/, '')
     .trim()
     .replace(/\s+/g, ' ')
-}
-
-function formatTime(time: string): string {
-  if (!time) return time
-  if (time.toLowerCase().includes('min')) return time
-  return time.replace(/\s*minutes?\s*/gi, ' min').trim()
 }
 
 function cleanNullableText(value?: string | null): string | undefined {
@@ -488,19 +483,19 @@ let normalizedInstructions: InstructionGroup[] | null = null
                   {metadata.prepTime && (
                     <div>
                       <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Prep</div>
-                      <div className="font-medium text-slate-900">{formatTime(metadata.prepTime)}</div>
+                      <div className="font-medium text-slate-900">{formatRecipeTime(metadata.prepTime)}</div>
                     </div>
                   )}
                   {metadata.cookTime && (
                     <div>
                       <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Cook</div>
-                      <div className="font-medium text-slate-900">{formatTime(metadata.cookTime)}</div>
+                      <div className="font-medium text-slate-900">{formatRecipeTime(metadata.cookTime)}</div>
                     </div>
                   )}
                   {metadata.totalTime && (
                     <div>
                       <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total</div>
-                      <div className="font-medium text-slate-900">{formatTime(metadata.totalTime)}</div>
+                      <div className="font-medium text-slate-900">{formatRecipeTime(metadata.totalTime)}</div>
                     </div>
                   )}
                   {metadata.servings && (
