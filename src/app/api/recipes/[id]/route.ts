@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabaseClient'
+import { createServerClient } from '@/lib/supabase/server'
 import { saveRecipeVersion } from '@/lib/saveRecipeVersion'
+import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
+import { RATE_LIMITS } from '@/lib/rateLimit'
+import { toRecipeResponse } from '@/lib/recipeResponses'
+import { apiErrorResponse } from '@/lib/apiErrors'
+import { parseJsonRequest, recipeUpdateRequestSchema } from '@/lib/validation'
 import type { Json } from '@/types/json'
 
 // Minimal UUID v4 validator to guard incoming IDs
@@ -21,12 +26,15 @@ type InstructionValue = InstructionGroup[] | string | null | undefined
 /**
  * GET /api/recipes/[id]
  *
- * Fetch a single recipe by id using the service role client (bypasses RLS).
+ * Fetch a single recipe by id using the authenticated cookie client.
  */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await authenticateApiRequest(req)
+  if (auth.error) return auth.error
+
   try {
     const resolvedParams = await params
 
@@ -37,12 +45,12 @@ export async function GET(
 
     if (!pathId) {
       return NextResponse.json(
-        { success: false, error: 'Missing recipe id', details: { params: resolvedParams } },
+        { success: false, error: 'Missing recipe id', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
 
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     const { data, error } = await supabase
       .from('recipes')
@@ -55,27 +63,20 @@ export async function GET(
       return NextResponse.json(
         {
           success: false,
-          error: error?.message || 'Recipe not found',
-          code: error?.code,
-          details: error?.details || null,
-          hint: error?.hint || null,
-          pathId,
+          error: error?.code === 'PGRST116' ? 'Recipe not found' : 'Could not fetch recipe',
+          code: error?.code === 'PGRST116' ? 'NOT_FOUND' : 'DATABASE_ERROR',
         },
         { status: error?.code === 'PGRST116' ? 404 : 500 }
       )
     }
 
-    return NextResponse.json({ success: true, data }, { status: 200 })
+    return NextResponse.json(
+      { success: true, data: await toRecipeResponse(supabase, data as Record<string, unknown>) },
+      { status: 200 },
+    )
   } catch (error) {
     console.error('Error fetching recipe:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unexpected error fetching recipe',
-        details: error instanceof Error ? error.stack : error,
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }
 
@@ -245,6 +246,12 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id?: string }> }
 ) {
+  const auth = await authenticateApiRequest(req, { stateChanging: true })
+  if (auth.error) return auth.error
+  const profileId = auth.profile!.profileId
+  const rateLimitError = await checkApiRateLimit(profileId, 'writes', RATE_LIMITS.writes)
+  if (rateLimitError) return rateLimitError
+
   try {
     const resolvedParams = await params
 
@@ -255,13 +262,13 @@ export async function PUT(
 
     if (!isUuid(id)) {
       return NextResponse.json(
-        { success: false, error: 'Invalid recipe id', details: { params: resolvedParams, pathId } },
+        { success: false, error: 'Invalid recipe id', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
     
     // Parse request body
-    const body = await req.json()
+    const body = await parseJsonRequest(req, recipeUpdateRequestSchema)
     const { 
       title, 
       ingredients, 
@@ -271,7 +278,6 @@ export async function PUT(
       notes, 
       source_url, 
       cookbookSource, 
-      user_id,
       // Metadata fields
       servings,
       prep_time,
@@ -287,7 +293,7 @@ export async function PUT(
     } = body
 
     // Get Supabase client
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     // Always fetch existing recipe first to track versions
     const { data: existing, error: fetchError } = await supabase
@@ -298,7 +304,7 @@ export async function PUT(
 
     if (fetchError || !existing) {
       return NextResponse.json(
-        { success: false, error: 'Recipe not found' },
+        { success: false, error: 'Recipe not found', code: 'NOT_FOUND' },
         { status: 404 }
       )
     }
@@ -309,7 +315,7 @@ export async function PUT(
     if (title !== undefined) {
       if (!title || typeof title !== 'string' || title.trim().length === 0) {
         return NextResponse.json(
-          { success: false, error: 'Title cannot be empty' },
+          { success: false, error: 'Title cannot be empty', code: 'INVALID_REQUEST' },
           { status: 400 }
         )
       }
@@ -379,9 +385,16 @@ export async function PUT(
       } else if (Array.isArray(instructions)) {
         // Structured format - convert to string for storage (legacy compatibility)
         // But we'll track the structured version for versioning
-        normalizedInstructions = instructions
+        const isStructured = instructions.every(
+          (group): group is { section: string; steps: string[] } =>
+            typeof group === 'object' && group !== null && 'steps' in group,
+        )
         const instructionParts: string[] = []
-        instructions.forEach((group: { section?: string; steps?: string[] }) => {
+        instructions.forEach((group: { section?: string; steps?: string[] } | string) => {
+          if (typeof group === 'string') {
+            instructionParts.push(group)
+            return
+          }
           if (group.section && group.section.trim()) {
             instructionParts.push(group.section)
           }
@@ -391,6 +404,9 @@ export async function PUT(
             })
           }
         })
+        normalizedInstructions = isStructured
+          ? instructions as InstructionGroup[]
+          : instructionParts.join('\n\n') || null
         updateData.instructions = instructionParts.join('\n\n') || null
       } else {
         normalizedInstructions = null
@@ -417,10 +433,10 @@ export async function PUT(
       if (rating === null || rating === '') {
         updateData.rating = null
       } else {
-        const ratingNum = typeof rating === 'string' ? parseInt(rating, 10) : rating
+        const ratingNum = Number(rating)
         if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 10) {
           return NextResponse.json(
-            { success: false, error: 'Rating must be a number between 1 and 10' },
+            { success: false, error: 'Rating must be a number between 1 and 10', code: 'INVALID_REQUEST' },
             { status: 400 }
           )
         }
@@ -486,13 +502,13 @@ export async function PUT(
     // Ensure at least one field is being updated
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
-        { success: false, error: 'No fields to update' },
+        { success: false, error: 'No fields to update', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
 
-    // Track versions for changed fields (only if user_id is provided)
-    if (user_id && typeof user_id === 'string') {
+    // Track versions using the verified authenticated family profile.
+    if (profileId) {
       const fieldsToTrack = ['title', 'ingredients', 'instructions', 'tags', 'servings', 'nutrition']
       
       for (const field of fieldsToTrack) {
@@ -549,7 +565,6 @@ export async function PUT(
             const safeNew = newValue === undefined ? null : newValue
             await saveRecipeVersion({
               recipe_id: id,
-              user_id,
               field_changed: field,
               previous_value: safePrevious,
               new_value: safeNew,
@@ -569,7 +584,6 @@ export async function PUT(
               JSON.stringify(oldMetadata.nutrition) !== JSON.stringify(newMetadata.nutrition)) {
             await saveRecipeVersion({
               recipe_id: id,
-              user_id,
               field_changed: 'nutrition',
               previous_value: oldMetadata.nutrition,
               new_value: newMetadata.nutrition,
@@ -580,7 +594,6 @@ export async function PUT(
           if (oldMetadata?.servings !== newMetadata?.servings) {
             await saveRecipeVersion({
               recipe_id: id,
-              user_id,
               field_changed: 'servings',
               previous_value: oldMetadata?.servings || null,
               new_value: newMetadata?.servings || null,
@@ -593,7 +606,8 @@ export async function PUT(
       }
     }
 
-    // Update in Supabase using server client (bypasses RLS)
+    // Update through the cookie-aware server client so Supabase RLS remains
+    // the final authorization boundary.
     const { data, error } = await supabase
       .from('recipes')
       .update(updateData)
@@ -604,29 +618,26 @@ export async function PUT(
     if (error) {
       console.error('Supabase update error:', error)
       return NextResponse.json(
-        { success: false, error: `Database error: ${error.message}` },
+        { success: false, error: 'Could not update recipe', code: 'DATABASE_ERROR' },
         { status: 500 }
       )
     }
 
     if (!data) {
       return NextResponse.json(
-        { success: false, error: 'Recipe not found' },
+        { success: false, error: 'Recipe not found', code: 'NOT_FOUND' },
         { status: 404 }
       )
     }
 
-    // Return the updated record
+    // Return the updated record with a short-lived signed image URL.
     return NextResponse.json(
-      { success: true, data },
+      { success: true, data: await toRecipeResponse(supabase, data as Record<string, unknown>) },
       { status: 200 }
     )
 
   } catch (error) {
     console.error('Unexpected error:', error)
-    return NextResponse.json(
-      { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }

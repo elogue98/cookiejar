@@ -26,3 +26,13 @@ Use the shared guidance in `/Users/eoinlogue/AGENTS.md` plus these repo-specific
 - For UI changes, check desktop and mobile widths, changed interactions, loading/error states, and the browser console.
 - When touching API routes, route types, OpenAI integration, Supabase integration, or shared infrastructure, run `npm test`, `npx tsc --noEmit`, and `npm run build`.
 - Work is done when the changed workflow succeeds, expected failure states remain safe, relevant checks pass, and no secrets or unintended database changes appear in the diff.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

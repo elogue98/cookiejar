@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useUser } from '@/lib/userContext'
 import AnimatedModal from './AnimatedModal'
 import LoadingOverlay from './LoadingOverlay'
 
@@ -42,7 +41,6 @@ interface ExtractedRecipeData {
 
 export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModalProps) {
   const router = useRouter()
-  const { user } = useUser()
   const [mode, setMode] = useState<ImportMode>('url')
   const [url, setUrl] = useState('')
   const [text, setText] = useState('')
@@ -71,7 +69,6 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           url: url.trim(),
-          userId: user?.id,
         }),
       })
 
@@ -110,7 +107,6 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           text: text.trim(),
-          userId: user?.id,
         }),
       })
 
@@ -160,7 +156,6 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         imageMimeType: dataToFinalize.imageMimeType,
         ingredientSections: dataToFinalize.ingredientSections,
         instructionSections: dataToFinalize.instructionSections,
-        userId: user?.id,
         servings: dataToFinalize.servings,
         prepTime: dataToFinalize.prepTime,
         cookTime: dataToFinalize.cookTime,

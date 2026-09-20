@@ -27,7 +27,8 @@ export async function fetchPlaces() {
   const { data, error } = await supabase.from('places').select('*').order('updated_at', { ascending: false })
 
   if (error) {
-    throw new Error(`Failed to fetch places: ${error.message}`)
+    console.error('Failed to fetch places', { code: error.code })
+    throw new Error('Failed to fetch places')
   }
 
   const places = ((data as Place[]) || []).map((p) => ({ ...p, rating_average: null, rating_count: 0 }))
@@ -72,7 +73,8 @@ export async function fetchPlace(id: string) {
     .single()
 
   if (error) {
-    throw new Error(`Failed to fetch place ${id}: ${error.message}`)
+    console.error('Failed to fetch place', { code: error.code })
+    throw new Error('Failed to fetch place')
   }
 
   return data as Place

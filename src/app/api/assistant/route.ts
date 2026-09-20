@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aiComplete } from '@/lib/ai'
-
-interface RequestBody {
-  recipeTitle: string
-  ingredients: { section: string; items: string[] }[] | null
-  instructions: { section: string; steps: string[] }[] | null
-  tags: string[] | null
-  userMessage: string
-  messageHistory: { role: 'user' | 'assistant'; content: string }[]
-}
+import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
+import { apiErrorResponse } from '@/lib/apiErrors'
+import { RATE_LIMITS } from '@/lib/rateLimit'
+import { assistantRequestSchema, parseJsonRequest } from '@/lib/validation'
 
 function formatRecipeContext(
   title: string,
@@ -58,20 +53,29 @@ function formatRecipeContext(
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await authenticateApiRequest(req, { stateChanging: true })
+  if (auth.error) return auth.error
+  const rateLimitError = await checkApiRateLimit(auth.profile!.profileId, 'assistant', RATE_LIMITS.assistant)
+  if (rateLimitError) return rateLimitError
+
   try {
-    const body: RequestBody = await req.json()
+    const body = await parseJsonRequest(req, assistantRequestSchema)
 
     const { recipeTitle, ingredients, instructions, tags, userMessage, messageHistory } = body
 
     if (!recipeTitle || !userMessage) {
       return NextResponse.json(
-        { error: 'Missing required fields: recipeTitle and userMessage' },
+        {
+          success: false,
+          error: 'Missing required fields: recipeTitle and userMessage',
+          code: 'INVALID_REQUEST',
+        },
         { status: 400 }
       )
     }
 
     // Format recipe context
-    const recipeContext = formatRecipeContext(recipeTitle, ingredients, instructions, tags)
+    const recipeContext = formatRecipeContext(recipeTitle, ingredients, instructions, tags ?? null)
 
     // Build system prompt
     const systemPrompt = `You are CookieBot, a friendly and sarcastically honest cooking assistant.
@@ -105,11 +109,6 @@ ${recipeContext}`
 
     return NextResponse.json({ response })
   } catch (error) {
-    console.error('Error in /api/assistant:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }
-

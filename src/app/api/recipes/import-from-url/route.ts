@@ -1,10 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { NextResponse } from 'next/server'
 import * as cheerio from 'cheerio'
-import { createServerClient } from '@/lib/supabaseClient'
+import { createServerClient } from '@/lib/supabase/server'
+import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
+import { RATE_LIMITS } from '@/lib/rateLimit'
 import { generateTagsForRecipe } from '@/lib/aiTagging'
 import { uploadOptimizedImage } from '@/lib/imageOptimization'
 import { aiComplete } from '@/lib/ai'
+import { safeFetchImage, safeFetchText } from '@/lib/safeFetch'
+import { createSignedRecipeImageUrl } from '@/lib/imageUrls'
+import { toRecipeResponse } from '@/lib/recipeResponses'
+import { apiErrorResponse } from '@/lib/apiErrors'
+import { assertTextLimit, httpUrlSchema, MAX_AI_TEXT_CHARS, parseJsonRequest } from '@/lib/validation'
+import { z } from 'zod'
+import {
+  EXPECTED_MATCHES_JSON_SCHEMA,
+  INSTRUCTION_SECTIONS_JSON_SCHEMA,
+  expectedMatchesOutputSchema,
+  instructionSectionsOutputSchema,
+} from '@/lib/aiSchemas'
 
 export type ParsedRecipe = {
   title: string
@@ -12,6 +26,8 @@ export type ParsedRecipe = {
   instructions: string[]
   imageUrl: string | null
 }
+
+const importUrlRequestSchema = z.object({ url: httpUrlSchema }).strict()
 
 type Platform = 'tasty' | 'wprm' | 'mediavine' | 'bbc' | 'unknown'
 
@@ -921,7 +937,7 @@ ${rawText}`
       [
         {
           role: 'system',
-          content: 'You are a helpful recipe instructions extractor. Always return valid JSON array of { section: string, steps: string[] } objects.'
+        content: 'You are a helpful recipe instructions extractor. Always return a strict JSON object with a sections array of { section: string, steps: string[] } objects.'
         },
         {
           role: 'user',
@@ -930,7 +946,10 @@ ${rawText}`
       ],
       {
         temperature: 0.3,
-        response_format: { type: 'json_object' }
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'instruction_sections', strict: true, schema: INSTRUCTION_SECTIONS_JSON_SCHEMA },
+        }
       }
     )
 
@@ -938,44 +957,28 @@ ${rawText}`
       return null
     }
 
-    // Parse JSON response
-    let parsed: any
+    // Parse and validate the complete structured output before using steps.
+    let parsed: unknown
     try {
-      // Try to extract array from response
-      const arrayMatch = response.match(/\[[\s\S]*?\]/)
-      if (arrayMatch) {
-        parsed = JSON.parse(arrayMatch[0])
-      } else {
-        // Try parsing as object with array property
-        const obj = JSON.parse(response)
-        parsed = obj.instructions || obj.steps || obj
-        if (!Array.isArray(parsed)) {
-          parsed = [parsed]
-        }
-      }
+      parsed = JSON.parse(response)
     } catch {
       return null
     }
 
-    if (!Array.isArray(parsed)) {
-      return null
-    }
+    const validated = instructionSectionsOutputSchema.safeParse(parsed)
+    if (!validated.success) return null
 
     // Validate and clean results
     const sections: InstructionSection[] = []
-    parsed.forEach((item: any) => {
-      if (item && typeof item === 'object') {
-        const section = cleanText(String(item.section || '')).toUpperCase().replace(/:\s*$/, '')
-        const steps = Array.isArray(item.steps)
-          ? item.steps.map((step: any) => cleanText(String(step))).filter(Boolean)
-          : []
+    validated.data.sections.forEach((item) => {
+      const section = cleanText(item.section ?? '').toUpperCase().replace(/:\s*$/, '')
+      const steps = item.steps.map((step) => cleanText(step)).filter(Boolean)
 
-        if (steps.length > 0) {
-          sections.push({
-            section: section || '',
-            steps
-          })
-        }
+      if (steps.length > 0) {
+        sections.push({
+          section: section || '',
+          steps,
+        })
       }
     })
 
@@ -1879,16 +1882,25 @@ Output format example:
         {
           role: 'system',
           content:
-            'You are an ingredient-to-step tagger. Return only valid JSON mapping step ids to ingredient id arrays.',
+            'You are an ingredient-to-step tagger. Return a strict JSON object with a matches array. Each match contains stepId and ingredientIds.',
         },
         { role: 'user', content: prompt },
       ],
-      { temperature: 0, response_format: { type: 'json_object' } },
+      {
+        temperature: 0,
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'expected_matches', strict: true, schema: EXPECTED_MATCHES_JSON_SCHEMA },
+        },
+      },
     )
 
-    const parsed = JSON.parse(response)
-    if (parsed && typeof parsed === 'object') {
-      return parsed as Record<string, string[]>
+    const parsed = expectedMatchesOutputSchema.parse(JSON.parse(response))
+    if (parsed.matches.length > 0) {
+      return parsed.matches.reduce<Record<string, string[]>>((result, match) => {
+        result[match.stepId] = match.ingredientIds
+        return result
+      }, {})
     }
   } catch (err) {
     console.warn('AI expectedMatches generation failed:', err)
@@ -1966,52 +1978,37 @@ export async function parseRecipe(html: string, url: string): Promise<ParsedReci
  * POST /api/recipes/import-from-url
  */
 export async function POST(req: Request) {
+  const auth = await authenticateApiRequest(req, { stateChanging: true })
+  if (auth.error) return auth.error
+  const profileId = auth.profile!.profileId
+  const rateLimitError = await checkApiRateLimit(profileId, 'imports', RATE_LIMITS.imports)
+  if (rateLimitError) return rateLimitError
+
   try {
-    const body = await req.json()
-    const { url, userId } = body
+    const { url } = await parseJsonRequest(req, importUrlRequestSchema)
 
-    if (!url || typeof url !== 'string') {
-      return NextResponse.json(
-        { success: false, error: 'URL is required and must be a string' },
-        { status: 400 }
-      )
-    }
-
-    let urlObj: URL
     try {
-      urlObj = new URL(url)
+      new URL(url)
     } catch {
       return NextResponse.json(
-        { success: false, error: 'Invalid URL format' },
+        { success: false, error: 'Invalid URL format', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
 
     let html: string
     try {
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)'
-        }
-      })
-
-      if (!response.ok) {
-        return NextResponse.json(
-          { success: false, error: `Failed to fetch URL: ${response.status} ${response.statusText}` },
-          { status: response.status }
-        )
-      }
-
-      html = await response.text()
+      html = (await safeFetchText(url)).text
     } catch (error) {
       return NextResponse.json(
-        { success: false, error: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}` },
-        { status: 500 }
+        { success: false, error: 'Could not fetch the source URL', code: 'REMOTE_FETCH_FAILED' },
+        { status: 502 }
       )
     }
 
     // Parse recipe using universal parser
     const parsed = await parseRecipe(html, url)
+    assertTextLimit(JSON.stringify(parsed), MAX_AI_TEXT_CHARS)
 
     // Generate AI tags
     let aiTags: string[] = []
@@ -2064,63 +2061,33 @@ export async function POST(req: Request) {
     }
 
     // Insert into Supabase
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
-    // Try to insert with created_by first, fallback without it if column doesn't exist
-    let data, error
-    if (userId && typeof userId === 'string') {
-      // Try with created_by
-      let result = await supabase
+    let result = await supabase
+      .from('recipes')
+      .insert({ ...recipeData, created_by: profileId })
+      .select()
+      .single()
+    let data = result.data
+    let error = result.error
+
+    if (error && (error.message.includes('expected_matches') || error.message.includes('column') || error.code === '42703')) {
+      const fallbackData = { ...recipeData }
+      delete (fallbackData as any).expected_matches
+      result = await supabase
         .from('recipes')
-        .insert({ ...recipeData, created_by: userId })
+        .insert({ ...fallbackData, created_by: profileId })
         .select()
         .single()
 
       data = result.data
       error = result.error
-
-      // If error is about missing column, retry without created_by or expected_matches
-      if (error && (error.message.includes('created_by') || error.message.includes('expected_matches') || error.message.includes('column') || error.code === '42703')) {
-        const fallbackData = { ...recipeData }
-        delete (fallbackData as any).expected_matches
-        result = await supabase
-          .from('recipes')
-          .insert(fallbackData)
-          .select()
-          .single()
-
-        data = result.data
-        error = result.error
-      }
-    } else {
-      // No userId, insert without created_by
-      let result = await supabase
-        .from('recipes')
-        .insert(recipeData)
-        .select()
-        .single()
-
-      data = result.data
-      error = result.error
-
-      if (error && (error.message.includes('expected_matches') || error.message.includes('column') || error.code === '42703')) {
-        const fallbackData = { ...recipeData }
-        delete (fallbackData as any).expected_matches
-        result = await supabase
-          .from('recipes')
-          .insert(fallbackData)
-          .select()
-          .single()
-
-        data = result.data
-        error = result.error
-      }
     }
 
     if (error) {
       console.error('Supabase insert error:', error)
       return NextResponse.json(
-        { success: false, error: `Database error: ${error.message}` },
+        { success: false, error: 'Could not save imported recipe', code: 'DATABASE_ERROR' },
         { status: 500 }
       )
     }
@@ -2129,19 +2096,13 @@ export async function POST(req: Request) {
     let finalImageUrl: string | null = null
     if (parsed.imageUrl && data.id) {
       try {
-        const imageResponse = await fetch(parsed.imageUrl, {
-          headers: {
-            'User-Agent': 'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)'
-          }
-        })
-
-        if (imageResponse.ok) {
-          const imageArrayBuffer = await imageResponse.arrayBuffer()
-          const imageBuffer = Buffer.from(imageArrayBuffer)
+        const imageResponse = await safeFetchImage(parsed.imageUrl)
+        {
+          const imageBuffer = Buffer.from(imageResponse.bytes)
 
           // Determine original extension for cleanup
           let extension = 'jpg'
-          const contentType = imageResponse.headers.get('content-type') || 'image/jpeg'
+          const contentType = imageResponse.contentType
 
           if (contentType.includes('png')) {
             extension = 'png'
@@ -2163,16 +2124,17 @@ export async function POST(req: Request) {
           }
 
           // Upload optimized image (utility handles optimization and cleanup)
-          finalImageUrl = await uploadOptimizedImage(supabase, imageBuffer, data.id, extension)
+          finalImageUrl = await uploadOptimizedImage(supabase, imageBuffer, data.id, extension, contentType)
 
           if (finalImageUrl) {
             const { error: updateError } = await supabase
               .from('recipes')
-              .update({ image_url: finalImageUrl })
+              .update({ image_path: finalImageUrl })
               .eq('id', data.id)
 
             if (!updateError) {
-              data.image_url = finalImageUrl
+              data.image_path = finalImageUrl
+              data.image_url = await createSignedRecipeImageUrl(supabase, finalImageUrl)
             }
           }
         }
@@ -2182,15 +2144,12 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      { success: true, data },
+      { success: true, data: await toRecipeResponse(supabase, data as Record<string, unknown>) },
       { status: 201 }
     )
 
   } catch (error) {
     console.error('Unexpected error:', error)
-    return NextResponse.json(
-      { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }

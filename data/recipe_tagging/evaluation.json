@@ -1,0 +1,114 @@
+[
+  {
+    "id": "indian-chicken-curry",
+    "title": "Indian Chicken Curry",
+    "ingredients": ["chicken thighs", "tomato", "onion", "garam masala"],
+    "instructions": "Simmer the spiced chicken and tomato sauce until tender.",
+    "expectedTags": ["indian", "chicken", "tomato", "curry"]
+  },
+  {
+    "id": "sheet-pan-salmon",
+    "title": "Roasted Salmon with Vegetables",
+    "ingredients": ["salmon", "broccoli", "olive oil", "lemon"],
+    "instructions": "Roast the salmon and vegetables on one sheet pan until cooked through.",
+    "expectedTags": ["salmon", "fish", "roasted"]
+  },
+  {
+    "id": "quick-tofu-stir-fry",
+    "title": "Quick Tofu Stir-Fry",
+    "ingredients": ["tofu", "mixed vegetables", "soy sauce", "sesame oil"],
+    "instructions": "Stir-fry the tofu and vegetables. This 10 minute dinner is ready fast.",
+    "expectedTags": ["vegetarian", "vegan", "stir-fry", "quick"]
+  },
+  {
+    "id": "chocolate-chip-cookies",
+    "title": "Chocolate Chip Cookies",
+    "ingredients": ["flour", "butter", "sugar", "chocolate chips"],
+    "instructions": "Bake until the cookies are golden at the edges.",
+    "expectedTags": ["cookie", "baked"]
+  },
+  {
+    "id": "tomato-basil-pasta",
+    "title": "Tomato Basil Pasta",
+    "ingredients": ["pasta", "tomato", "parmesan cheese", "basil"],
+    "instructions": "Boil the pasta and toss it with the tomato sauce and cheese.",
+    "expectedTags": ["pasta", "tomato", "cheese", "boiled"]
+  },
+  {
+    "id": "slow-cooker-beef-stew",
+    "title": "Slow Cooker Beef Stew",
+    "ingredients": ["beef", "potato", "carrot", "beef stock"],
+    "instructions": "Cook the beef and vegetables slowly overnight until tender.",
+    "expectedTags": ["beef", "potato", "slow-cooked", "comfort-food"]
+  },
+  {
+    "id": "grilled-shrimp-tacos",
+    "title": "Mexican Grilled Shrimp Tacos",
+    "ingredients": ["shrimp", "corn tortillas", "cabbage", "lime"],
+    "instructions": "Grill the shrimp and serve them in tortillas with cabbage.",
+    "expectedTags": ["mexican", "grilled", "shrimp"]
+  },
+  {
+    "id": "roasted-vegetable-salad",
+    "title": "Roasted Vegetable Salad",
+    "ingredients": ["mixed vegetables", "greens", "olive oil", "lemon"],
+    "instructions": "Roast the vegetables, then toss them with greens and dressing.",
+    "expectedTags": ["roasted", "salad", "vegetarian", "healthy"]
+  },
+  {
+    "id": "plain-pancakes",
+    "title": "Plain Pancakes",
+    "ingredients": ["flour", "milk", "eggs", "butter"],
+    "instructions": "Whisk the batter and cook each pancake in a skillet.",
+    "expectedTags": []
+  },
+  {
+    "id": "cheese-pizza",
+    "title": "Classic Cheese Pizza",
+    "ingredients": ["bread dough", "tomato sauce", "mozzarella cheese"],
+    "instructions": "Bake the pizza until the crust is crisp and the cheese is bubbling.",
+    "expectedTags": ["pizza", "cheese", "bread", "baked"]
+  },
+  {
+    "id": "cucumber-salad",
+    "title": "Fresh Cucumber Salad",
+    "ingredients": ["cucumber", "vinegar", "dill", "onion"],
+    "instructions": "Marinate the raw vegetables for five minutes before serving.",
+    "expectedTags": ["raw", "marinated", "salad", "vegetarian", "quick"]
+  },
+  {
+    "id": "american-beef-burger",
+    "title": "American Beef Burger",
+    "ingredients": ["beef", "burger buns", "cheddar cheese", "lettuce"],
+    "instructions": "Grill the beef patties and serve them in the buns with cheese.",
+    "expectedTags": ["american", "beef", "burger", "grilled", "cheese"]
+  },
+  {
+    "id": "chicken-rice-casserole",
+    "title": "Chicken and Rice Casserole",
+    "ingredients": ["chicken", "rice", "vegetables", "stock"],
+    "instructions": "Bake the chicken and rice together in a casserole dish.",
+    "expectedTags": ["chicken", "rice", "casserole", "baked"]
+  },
+  {
+    "id": "thai-coconut-soup",
+    "title": "Thai Coconut Soup with Shrimp",
+    "ingredients": ["shrimp", "coconut milk", "mushrooms", "lime"],
+    "instructions": "Simmer the broth and shrimp gently until the shrimp are cooked.",
+    "expectedTags": ["thai", "shrimp", "soup"]
+  },
+  {
+    "id": "french-roasted-potatoes",
+    "title": "French Roasted Potatoes",
+    "ingredients": ["potatoes", "olive oil", "garlic", "herbs"],
+    "instructions": "Roast the potatoes until crisp and golden.",
+    "expectedTags": ["french", "potato", "roasted", "vegetarian"]
+  },
+  {
+    "id": "ambiguous-sandwich",
+    "title": "Lunch Sandwich",
+    "ingredients": ["bread", "cheese", "tomato", "lettuce"],
+    "instructions": "Assemble the sandwich and serve it with a side salad.",
+    "expectedTags": ["sandwich", "bread", "cheese", "vegetarian"]
+  }
+]

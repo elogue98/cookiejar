@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabaseClient'
+import { createServerClient } from '@/lib/supabase/server'
 import { addComment } from '@/lib/addComment'
+import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
+import { RATE_LIMITS } from '@/lib/rateLimit'
+import { apiErrorResponse } from '@/lib/apiErrors'
+import { commentRequestSchema, parseJsonRequest } from '@/lib/validation'
 
 type CommentUser = {
   id: string
@@ -32,10 +36,13 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await authenticateApiRequest(req)
+  if (auth.error) return auth.error
+
   try {
     const { id } = await params
 
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     // Fetch comments with user information
     const { data: comments, error } = await supabase
@@ -61,7 +68,7 @@ export async function GET(
         return NextResponse.json({ success: true, data: [] })
       }
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: 'Could not fetch comments', code: 'DATABASE_ERROR' },
         { status: 500 }
       )
     }
@@ -91,13 +98,7 @@ export async function GET(
     return NextResponse.json({ success: true, data: transformedComments })
   } catch (error) {
     console.error('Unexpected error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }
 
@@ -105,50 +106,47 @@ export async function GET(
  * POST /api/recipes/[id]/comments
  * 
  * Creates a new comment for a recipe
- * Body: { message, user_id }
+ * Body: { message }
  */
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await authenticateApiRequest(req, { stateChanging: true })
+  if (auth.error) return auth.error
+  const profileId = auth.profile!.profileId
+  const rateLimitError = await checkApiRateLimit(profileId, 'writes', RATE_LIMITS.writes)
+  if (rateLimitError) return rateLimitError
+
   try {
     const { id } = await params
-    const body = await req.json()
-    const { message, user_id } = body
+    const { message } = await parseJsonRequest(req, commentRequestSchema)
 
     if (!message || typeof message !== 'string' || !message.trim()) {
       return NextResponse.json(
-        { success: false, error: 'Message is required' },
-        { status: 400 }
-      )
-    }
-
-    if (!user_id || typeof user_id !== 'string') {
-      return NextResponse.json(
-        { success: false, error: 'user_id is required' },
+        { success: false, error: 'Message is required', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
 
     const result = await addComment({
       recipe_id: id,
-      user_id,
       message: message.trim(),
     })
 
     if (!result.success) {
       return NextResponse.json(
-        { success: false, error: result.error },
+        { success: false, error: 'Could not create comment', code: 'COMMENT_CREATE_FAILED' },
         { status: 500 }
       )
     }
 
     // Fetch the comment with user info
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     const createdCommentId = result.data?.id
     if (!createdCommentId) {
       return NextResponse.json(
-        { success: false, error: 'Failed to create comment' },
+        { success: false, error: 'Failed to create comment', code: 'COMMENT_CREATE_FAILED' },
         { status: 500 }
       )
     }
@@ -171,7 +169,7 @@ export async function POST(
 
     if (fetchError || !commentWithUser) {
       return NextResponse.json(
-        { success: false, error: 'Failed to fetch created comment' },
+        { success: false, error: 'Failed to fetch created comment', code: 'DATABASE_ERROR' },
         { status: 500 }
       )
     }
@@ -196,14 +194,6 @@ export async function POST(
 
     return NextResponse.json({ success: true, data: transformedComment })
   } catch (error) {
-    console.error('Unexpected error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }
-

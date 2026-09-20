@@ -1,7 +1,8 @@
-'use client'
+import { requireFamilyPage } from '@/lib/serverPageAuth'
 
 import MealJarContent from '@/app/components/MealJar/MealJarContent'
 
-export default function MealsPage() {
+export default async function MealsPage() {
+  await requireFamilyPage()
   return <MealJarContent />
 }

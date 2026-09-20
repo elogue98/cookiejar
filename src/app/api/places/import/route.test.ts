@@ -19,8 +19,15 @@ const fetchMock = vi.fn<typeof fetch>()
 const supabaseMock = createSupabaseDouble()
 
 vi.stubGlobal('fetch', fetchMock)
-vi.mock('@/lib/supabaseClient', () => ({
+vi.mock('@/lib/supabase/server', () => ({
   createServerClient: () => supabaseMock,
+}))
+vi.mock('@/lib/apiSecurity', () => ({
+  authenticateApiRequest: vi.fn().mockResolvedValue({
+    profile: { authUserId: 'auth-user', profileId: 'profile-1' },
+    error: null,
+  }),
+  checkApiRateLimit: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('@/lib/placeTagging', () => ({
   generateTagsForPlace: vi.fn().mockResolvedValue(['coffee']),

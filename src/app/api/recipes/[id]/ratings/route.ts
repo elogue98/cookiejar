@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabaseClient'
+import { createServerClient } from '@/lib/supabase/server'
+import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
+import { RATE_LIMITS } from '@/lib/rateLimit'
+import { apiErrorResponse } from '@/lib/apiErrors'
+import { parseJsonRequest, ratingRequestSchema } from '@/lib/validation'
 
 /**
  * GET /api/recipes/[id]/ratings
@@ -9,19 +13,20 @@ import { createServerClient } from '@/lib/supabaseClient'
  * - Average rating across all users
  * - Total number of ratings
  * 
- * Query params: userId (optional)
+ * The current user's rating is derived from the authenticated family mapping.
  * Returns: { success: boolean, data?: { userRating: number | null, averageRating: number | null, totalRatings: number }, error?: string }
  */
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await authenticateApiRequest(req)
+  if (auth.error) return auth.error
+  const profileId = auth.profile!.profileId
+
   try {
     const { id } = await params
-    const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
-
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     // Get all ratings for this recipe
     const { data: ratings, error: ratingsError } = await supabase
@@ -43,7 +48,7 @@ export async function GET(
       }
       console.error('Error fetching ratings:', ratingsError)
       return NextResponse.json(
-        { success: false, error: `Database error: ${ratingsError.message}` },
+        { success: false, error: 'Could not fetch ratings', code: 'DATABASE_ERROR' },
         { status: 500 }
       )
     }
@@ -57,10 +62,9 @@ export async function GET(
       averageRating = Math.round((sum / totalRatings) * 10) / 10 // Round to 1 decimal place
     }
 
-    // Get current user's rating if userId is provided
     let userRating: number | null = null
-    if (userId && ratings) {
-      const userRatingData = ratings.find(r => r.user_id === userId)
+    if (ratings) {
+      const userRatingData = ratings.find(r => r.user_id === profileId)
       userRating = userRatingData?.rating || null
     }
 
@@ -74,10 +78,7 @@ export async function GET(
     })
   } catch (error) {
     console.error('Unexpected error:', error)
-    return NextResponse.json(
-      { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }
 
@@ -86,56 +87,53 @@ export async function GET(
  * 
  * Creates or updates a user's rating for a recipe.
  * 
- * Body: { userId: string, rating: number }
+ * Body: { rating: number }
  * Returns: { success: boolean, data?: { userRating: number, averageRating: number, totalRatings: number }, error?: string }
  */
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await authenticateApiRequest(req, { stateChanging: true })
+  if (auth.error) return auth.error
+  const profileId = auth.profile!.profileId
+  const rateLimitError = await checkApiRateLimit(profileId, 'writes', RATE_LIMITS.writes)
+  if (rateLimitError) return rateLimitError
+
   try {
     const { id } = await params
-    const body = await req.json()
-    const { userId, rating } = body
-
-    // Validate required fields
-    if (!userId || typeof userId !== 'string') {
-      return NextResponse.json(
-        { success: false, error: 'User ID is required' },
-        { status: 400 }
-      )
-    }
+    const { rating } = await parseJsonRequest(req, ratingRequestSchema)
 
     if (rating === undefined || rating === null) {
       return NextResponse.json(
-        { success: false, error: 'Rating is required' },
+        { success: false, error: 'Rating is required', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
 
-    const ratingNum = typeof rating === 'string' ? parseInt(rating, 10) : Number(rating)
+    const ratingNum = Number(rating)
     if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 10) {
       return NextResponse.json(
-        { success: false, error: 'Rating must be a number between 1 and 10' },
+        { success: false, error: 'Rating must be a number between 1 and 10', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
 
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     // Check if ratings table exists, if not return error
     const { data: existingRating, error: checkError } = await supabase
       .from('ratings')
       .select('*')
       .eq('recipe_id', id)
-      .eq('user_id', userId)
+      .eq('user_id', profileId)
       .single()
 
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows returned
       // If table doesn't exist, return error
       if (checkError.code === '42P01' || checkError.message.includes('does not exist')) {
         return NextResponse.json(
-          { success: false, error: 'Ratings table does not exist. Please run the migration_create_ratings_table.sql migration first.' },
+          { success: false, error: 'Ratings are temporarily unavailable', code: 'DATABASE_ERROR' },
           { status: 500 }
         )
       }
@@ -148,14 +146,14 @@ export async function POST(
         .from('ratings')
         .update({ rating: ratingNum, updated_at: new Date().toISOString() })
         .eq('recipe_id', id)
-        .eq('user_id', userId)
+        .eq('user_id', profileId)
         .select()
         .single()
 
       if (error) {
         console.error('Error updating rating:', error)
         return NextResponse.json(
-          { success: false, error: `Database error: ${error.message}` },
+          { success: false, error: 'Could not update rating', code: 'DATABASE_ERROR' },
           { status: 500 }
         )
       }
@@ -165,7 +163,7 @@ export async function POST(
         .from('ratings')
         .insert({
           recipe_id: id,
-          user_id: userId,
+          user_id: profileId,
           rating: ratingNum
         })
         .select()
@@ -174,7 +172,7 @@ export async function POST(
       if (error) {
         console.error('Error creating rating:', error)
         return NextResponse.json(
-          { success: false, error: `Database error: ${error.message}` },
+          { success: false, error: 'Could not create rating', code: 'DATABASE_ERROR' },
           { status: 500 }
         )
       }
@@ -207,10 +205,6 @@ export async function POST(
       }
     })
   } catch (error) {
-    console.error('Unexpected error:', error)
-    return NextResponse.json(
-      { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }

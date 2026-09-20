@@ -1,12 +1,14 @@
-import embeddingData from '../../.cache/ingredient_embeddings.json'
-
 type EmbeddingCache = {
   version: number
   dimension: number
   vectors: Record<string, number[]>
 }
 
-const cache: EmbeddingCache = embeddingData as EmbeddingCache
+const cache: EmbeddingCache = {
+  version: 1,
+  dimension: 256,
+  vectors: {},
+}
 const DIMENSION = cache.dimension || 256
 const vectorMap = new Map<string, number[]>()
 
@@ -96,4 +98,3 @@ export const embeddingSimilarity = (
   if (!ingredientVector || !stepVector) return null
   return cosineSimilarity(ingredientVector, stepVector)
 }
-

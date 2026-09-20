@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabaseClient'
+import { createServerClient } from '@/lib/supabase/server'
 import type { Json } from '@/types/json'
+import { authenticateApiRequest } from '@/lib/apiSecurity'
+import { apiErrorResponse } from '@/lib/apiErrors'
 
 type VersionUser = {
   id: string
@@ -29,10 +31,13 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await authenticateApiRequest(req)
+  if (auth.error) return auth.error
+
   try {
     const { id } = await params
 
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     // Fetch versions with user information
     const { data: versions, error } = await supabase
@@ -62,7 +67,7 @@ export async function GET(
         return NextResponse.json({ success: true, data: [] })
       }
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: 'Could not fetch recipe history', code: 'DATABASE_ERROR' },
         { status: 500 }
       )
     }
@@ -117,12 +122,6 @@ export async function GET(
     return NextResponse.json({ success: true, data: transformedVersions })
   } catch (error) {
     console.error('Unexpected error:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }

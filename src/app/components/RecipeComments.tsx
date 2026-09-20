@@ -67,7 +67,6 @@ export default function RecipeComments({ recipeId }: RecipeCommentsProps) {
         },
         body: JSON.stringify({
           message: newComment.trim(),
-          user_id: user.id,
         }),
       })
 

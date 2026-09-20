@@ -1,8 +1,13 @@
 import OpenAI from "openai";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+let client: OpenAI | undefined;
+
+function getClient(): OpenAI {
+  client ??= new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY!,
+  });
+  return client;
+}
 
 type Message = {
   role: "system" | "user" | "assistant";
@@ -12,7 +17,16 @@ type Message = {
 type AICompleteOptions = {
   temperature?: number;
   max_tokens?: number;
-  response_format?: { type: "json_object" | "text" };
+  response_format?:
+    | { type: "text" }
+    | {
+        type: "json_schema";
+        json_schema: {
+          name: string;
+          strict: true;
+          schema: Record<string, unknown>;
+        };
+      };
 };
 
 export async function aiComplete(
@@ -25,7 +39,7 @@ export async function aiComplete(
   try {
     console.log(`[AI] Using model: ${primaryModel}`);
 
-    const res = await client.chat.completions.create({
+    const res = await getClient().chat.completions.create({
       model: primaryModel,
       messages,
       ...options,
@@ -38,7 +52,7 @@ export async function aiComplete(
       err
     );
 
-    const res = await client.chat.completions.create({
+    const res = await getClient().chat.completions.create({
       model: fallbackModel,
       messages,
       ...options,
@@ -47,4 +61,3 @@ export async function aiComplete(
     return res.choices[0]?.message?.content || "";
   }
 }
-

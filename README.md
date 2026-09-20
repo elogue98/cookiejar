@@ -26,8 +26,9 @@ Copy `.env.local` from the example below (or run `cp .env.local.example .env.loc
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+NEXT_PUBLIC_APP_URL=https://your-production-domain.example
 OPENAI_API_KEY=your-openai-key
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_MODEL_FALLBACK=gpt-4o
@@ -36,6 +37,8 @@ NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY=your-google-maps-embed-key
 ```
 
 The Supabase keys power storage/auth, OpenAI is used for recipe imports/tagging, `GOOGLE_MAPS_API_KEY` is required for the Tip Jar Google Maps importer (enable the Places API), and `NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY` is required for the Tip Jar map view (enable Maps Embed API).
+
+The service-role key is server-only and must never be exposed to the browser. Complete the database/auth rollout from [docs/SECURITY_ROLLOUT.md](docs/SECURITY_ROLLOUT.md) before removing deployment protection.
 
 ## Learn More
 

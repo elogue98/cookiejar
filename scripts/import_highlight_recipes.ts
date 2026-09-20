@@ -16,11 +16,9 @@ import { spawnSync } from 'node:child_process'
 
 import type { IngredientGroup, InstructionGroup } from '@/lib/ingredientMatcher'
 import { parseRecipe, type ParsedRecipe } from '@/app/api/recipes/import-from-url/route'
+import { safeFetchText } from '@/lib/safeFetch'
 
 const DATASET_DIR = path.resolve(process.cwd(), 'data/ingredient_highlights')
-const USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
-
 const slugify = (value: string) =>
   value
     .toLowerCase()
@@ -68,15 +66,7 @@ const toInstructionGroups = (steps: string[]): InstructionGroup[] => [
 ]
 
 const fetchHtml = async (url: string) => {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': USER_AGENT,
-    },
-  })
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`)
-  }
-  return response.text()
+  return (await safeFetchText(url)).text
 }
 
 const runLabelCli = (filePath: string) => {

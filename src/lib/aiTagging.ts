@@ -1,4 +1,11 @@
 import { aiComplete } from '@/lib/ai'
+import { TAGS_JSON_SCHEMA, tagsOutputSchema } from './aiSchemas'
+import {
+  RECIPE_TAG_CUISINES,
+  RECIPE_TAG_DIETARY,
+  RECIPE_TAG_MAIN_INGREDIENTS,
+  RECIPE_TAG_METHODS,
+} from './recipeTagTaxonomy'
 
 /**
  * Input type for AI tagging function
@@ -13,35 +20,21 @@ export type TagInput = {
  * Free fallback: Generates basic tags from keywords in title and ingredients
  * This is used when OpenAI API key is not available
  */
-function generateFreeTags(input: TagInput): string[] {
+export function generateKeywordTagsForRecipe(input: TagInput): string[] {
   const tags: Set<string> = new Set()
   const title = input.title.toLowerCase()
 
   // Common cuisine keywords
-  const cuisines = [
-    'italian', 'chinese', 'japanese', 'indian', 'mexican', 'thai', 'french',
-    'greek', 'mediterranean', 'american', 'korean', 'vietnamese', 'spanish',
-    'italian', 'middle eastern', 'caribbean'
-  ]
+  const cuisines = RECIPE_TAG_CUISINES
 
   // Common cooking methods
-  const methods = [
-    'baked', 'fried', 'grilled', 'roasted', 'steamed', 'boiled', 'braised',
-    'slow-cooked', 'pressure-cooked', 'raw', 'marinated', 'smoked'
-  ]
+  const methods = RECIPE_TAG_METHODS
 
   // Common dietary tags
-  const dietary = [
-    'vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'keto', 'paleo',
-    'low-carb', 'high-protein', 'healthy', 'comfort-food'
-  ]
+  const dietary = RECIPE_TAG_DIETARY
 
   // Extract main ingredients from title (common proteins, vegetables, etc.)
-  const mainIngredients = [
-    'chicken', 'beef', 'pork', 'fish', 'salmon', 'shrimp', 'pasta', 'rice',
-    'potato', 'tomato', 'cheese', 'bread', 'cake', 'cookie', 'soup', 'salad',
-    'pizza', 'burger', 'sandwich', 'curry', 'stir-fry', 'casserole'
-  ]
+  const mainIngredients = RECIPE_TAG_MAIN_INGREDIENTS
 
   // Check title for keywords
   const allKeywords = [...cuisines, ...methods, ...dietary, ...mainIngredients]
@@ -103,7 +96,30 @@ function generateFreeTags(input: TagInput): string[] {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
-export async function generateTagsForRecipe(input: TagInput): Promise<string[]> {
+type GenerateTagsOptions = {
+  fallbackOnError?: boolean
+}
+
+type CurrentTaggingEvaluationResult =
+  | { source: 'openai'; tags: string[] }
+  | { source: 'unavailable'; reason: 'missing_key' | 'invalid_input' | 'invalid_response' | 'transport_error' }
+
+class StrictTaggingError extends Error {
+  constructor(
+    readonly reason: Extract<CurrentTaggingEvaluationResult, { source: 'unavailable' }>['reason'],
+    message: string,
+  ) {
+    super(message)
+    this.name = 'StrictTaggingError'
+  }
+}
+
+export async function generateTagsForRecipe(
+  input: TagInput,
+  options: GenerateTagsOptions = {},
+): Promise<string[]> {
+  const fallbackOnError = options.fallbackOnError !== false
+
   // Validate input
   if (!input.title || input.title.trim().length === 0) {
     console.warn('Empty title provided to generateTagsForRecipe')
@@ -113,8 +129,11 @@ export async function generateTagsForRecipe(input: TagInput): Promise<string[]> 
   // Validate API key
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
+    if (!fallbackOnError) {
+      throw new StrictTaggingError('missing_key', 'OPENAI_API_KEY is required for strict tag evaluation')
+    }
     console.warn('OPENAI_API_KEY not set, using free keyword-based tagging')
-    return generateFreeTags(input)
+    return generateKeywordTagsForRecipe(input)
   }
 
   try {
@@ -165,56 +184,37 @@ Return a JSON object with a "tags" property containing an array of tags. Example
       {
         temperature: 0.3, // Lower temperature for more consistent results
         max_tokens: 150, // Enough for 3-8 tags
-        response_format: { type: 'json_object' }, // Force JSON response
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'recipe_tags', strict: true, schema: TAGS_JSON_SCHEMA },
+        },
       }
     )
     if (!content) {
+      if (!fallbackOnError) throw new StrictTaggingError('invalid_response', 'OpenAI returned an empty tag response')
       console.warn('Empty response from OpenAI')
       return []
     }
 
-    // Parse JSON response
+    // Parse and validate the complete structured output before using any tags.
     let parsed: unknown
     try {
       parsed = JSON.parse(content)
     } catch {
-      // Try to extract array if response is not valid JSON
-      console.warn('Failed to parse OpenAI response as JSON, attempting fallback')
-      // Fallback: try to extract array from text
-      const arrayMatch = content.match(/\[[\s\S]*?\]/)
-      if (arrayMatch) {
-        try {
-          parsed = JSON.parse(arrayMatch[0])
-        } catch {
-          return []
-        }
-      } else {
-        return []
-      }
+      if (!fallbackOnError) throw new StrictTaggingError('invalid_response', 'OpenAI returned invalid tag JSON')
+      console.warn('Failed to parse OpenAI response as JSON, using keyword fallback')
+      return generateKeywordTagsForRecipe(input)
     }
 
-    // Extract tags from response
-    // OpenAI might return { tags: [...] } or just [...]
-    let tags: unknown[] = []
-    if (Array.isArray(parsed)) {
-      tags = parsed
-    } else if (isRecord(parsed) && Array.isArray(parsed.tags)) {
-      tags = parsed.tags
-    } else if (isRecord(parsed)) {
-      const arrayValue = Object.values(parsed).find((value): value is unknown[] =>
-        Array.isArray(value)
-      )
-      if (arrayValue) {
-        tags = arrayValue
-      }
+    const validated = tagsOutputSchema.safeParse(parsed)
+    if (!validated.success) {
+      if (!fallbackOnError) throw new StrictTaggingError('invalid_response', 'OpenAI returned an invalid tag payload')
+      return generateKeywordTagsForRecipe(input)
     }
 
     // Clean and validate tags
-    const cleanedTags = tags
+    const cleanedTags = validated.data.tags
       .map((tag) => {
-        if (typeof tag !== 'string') {
-          return null
-        }
         // Convert to lowercase, trim, remove extra spaces
         let cleaned = tag.toLowerCase().trim().replace(/\s+/g, ' ')
         // Remove quotes if present
@@ -250,14 +250,13 @@ Return a JSON object with a "tags" property containing an array of tags. Example
 
     return cleanedTags
   } catch (error: unknown) {
+    if (!fallbackOnError) throw error
+
     // Handle specific error types
-    if (
-      isRecord(error) &&
-      (error.status === 429 || error.code === 'insufficient_quota')
-    ) {
+    if (error instanceof Error && error.message.includes('429')) {
       // Quota exceeded - silently fall back to free tagging
       console.warn('OpenAI quota exceeded, using free keyword-based tagging')
-      return generateFreeTags(input)
+      return generateKeywordTagsForRecipe(input)
     }
     
     // Other errors - log but don't throw - fall back to free keyword-based tagging
@@ -268,6 +267,29 @@ Return a JSON object with a "tags" property containing an array of tags. Example
           ? error.message
           : String(error)
     console.error('Error generating AI tags, falling back to keyword-based tagging:', message)
-    return generateFreeTags(input)
+    return generateKeywordTagsForRecipe(input)
+  }
+}
+
+export async function generateTagsForRecipeForEvaluation(
+  input: TagInput,
+): Promise<CurrentTaggingEvaluationResult> {
+  if (!input.title || input.title.trim().length === 0) {
+    return { source: 'unavailable', reason: 'invalid_input' }
+  }
+  if (!process.env.OPENAI_API_KEY) {
+    return { source: 'unavailable', reason: 'missing_key' }
+  }
+
+  try {
+    return {
+      source: 'openai',
+      tags: await generateTagsForRecipe(input, { fallbackOnError: false }),
+    }
+  } catch (error: unknown) {
+    if (error instanceof StrictTaggingError) {
+      return { source: 'unavailable', reason: error.reason }
+    }
+    return { source: 'unavailable', reason: 'transport_error' }
   }
 }

@@ -1,6 +1,8 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { supabase } from './supabase/browser'
+import { createUserSession } from './userSession'
 
 export interface User {
   id: string
@@ -17,39 +19,48 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
-const USER_STORAGE_KEY = 'cookiejar_user'
-
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load user from localStorage on mount
+  const sessionRef = useRef<ReturnType<typeof createUserSession> | null>(null)
+
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(USER_STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        setUserState(parsed)
-      }
-    } catch (error) {
-      console.error('Error loading user from storage:', error)
-    } finally {
-      setIsLoading(false)
+    const session = createUserSession({
+      fetchProfile: signal => fetch('/api/auth/profile', { cache: 'no-store', signal }),
+      update: state => {
+        setUserState(state.user)
+        setIsLoading(state.isLoading)
+      },
+      unauthorized: () => {
+        if (window.location.pathname !== '/login') window.location.replace('/login')
+      },
+    })
+    sessionRef.current = session
+    // INITIAL_SESSION supplies the first identity; no duplicate getClaims request.
+    const { data: authState } = supabase.auth.onAuthStateChange((event, authSession) => {
+      session.handle(event, authSession?.user.id ?? null)
+    })
+
+    return () => {
+      authState.subscription.unsubscribe()
+      session.dispose()
+      sessionRef.current = null
     }
   }, [])
 
-  // Save user to localStorage whenever it changes
   const setUser = (newUser: User | null) => {
     setUserState(newUser)
-    if (newUser) {
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser))
-    } else {
-      localStorage.removeItem(USER_STORAGE_KEY)
-    }
   }
 
   const logoutUser = () => {
-    setUser(null)
+    sessionRef.current?.clear()
+    setUserState(null)
+    void fetch('/logout', { method: 'POST', credentials: 'same-origin' })
+      .catch(() => undefined)
+      .finally(() => {
+        void supabase.auth.signOut({ scope: 'local' })
+      })
   }
 
   return (
@@ -61,20 +72,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
 export function useUser() {
   const context = useContext(UserContext)
-  if (context === undefined) {
-    throw new Error('useUser must be used within a UserProvider')
-  }
+  if (!context) throw new Error('useUser must be used within a UserProvider')
   return context
 }
 
-// Helper functions for server/client compatibility
+/** @deprecated Use useUser() inside a client component. */
 export function getUser(): User | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const stored = localStorage.getItem(USER_STORAGE_KEY)
-    return stored ? JSON.parse(stored) : null
-  } catch {
-    return null
-  }
+  return null
 }
-

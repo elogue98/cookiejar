@@ -1,4 +1,5 @@
-import { supabase } from '@/lib/supabaseClient'
+import { requireFamilyPage } from '@/lib/serverPageAuth'
+import { createServerClient } from '@/lib/supabase/server'
 import { appendMetricMeasurement } from '@/lib/ingredientUnits'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -14,6 +15,7 @@ import RecipeInteractionWrapper from '@/app/components/RecipeInteractionWrapper'
 import ImportCompletionOverlay from '@/app/components/ImportCompletionOverlay'
 import type { IngredientGroup, InstructionGroup, Recipe } from '@/types/recipe'
 import { formatRecipeTime } from '@/lib/recipeTime'
+import { createSignedRecipeImageUrl } from '@/lib/imageUrls'
 
 // Helper functions
 function getDomain(url: string): string {
@@ -162,6 +164,9 @@ export default async function RecipeDetail({ params, searchParams }: PageProps) 
   const showImportOverlay = importStatus === 'review'
   const cleanRecipePath = `/recipes/${id}`
 
+  await requireFamilyPage()
+  const supabase = await createServerClient()
+
   const { data: recipe, error } = await supabase
     .from('recipes')
     .select('*')
@@ -170,6 +175,15 @@ export default async function RecipeDetail({ params, searchParams }: PageProps) 
 
   if (error || !recipe) {
     notFound()
+  }
+
+  let signedImageUrl: string | null = null
+  if (recipe.image_path) {
+    try {
+      signedImageUrl = await createSignedRecipeImageUrl(supabase, recipe.image_path)
+    } catch {
+      signedImageUrl = null
+    }
   }
 
   let creator: { id: string; name: string; avatar_url: string } | null = null
@@ -288,6 +302,7 @@ let normalizedInstructions: InstructionGroup[] | null = null
 
   const recipeData: Recipe = {
     ...recipe,
+    image_url: signedImageUrl,
     ingredients: normalizedIngredients || [],
     instructions: normalizedInstructions || [],
   cookbookSource: recipe.cookbooksource || recipe.cookbookSource || null,

@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabaseClient'
+import { createServerClient } from '@/lib/supabase/server'
+import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
+import { RATE_LIMITS } from '@/lib/rateLimit'
+import { apiErrorResponse } from '@/lib/apiErrors'
+import { parseJsonRequest, recipeCreateRequestSchema } from '@/lib/validation'
 import { generateTagsForRecipe } from '@/lib/aiTagging'
+import { toRecipeResponse } from '@/lib/recipeResponses'
 
 /**
  * POST /api/recipes/create
@@ -19,14 +24,20 @@ import { generateTagsForRecipe } from '@/lib/aiTagging'
  * Returns: { success: boolean, data?: Recipe, error?: string }
  */
 export async function POST(req: Request) {
+  const auth = await authenticateApiRequest(req, { stateChanging: true })
+  if (auth.error) return auth.error
+  const profileId = auth.profile!.profileId
+  const rateLimitError = await checkApiRateLimit(profileId, 'writes', RATE_LIMITS.writes)
+  if (rateLimitError) return rateLimitError
+
   try {
-    const body = await req.json()
-    const { title, ingredients, instructions, tags, rating, notes, userId } = body
+    const body = await parseJsonRequest(req, recipeCreateRequestSchema)
+    const { title, ingredients, instructions, tags, rating, notes } = body
 
     // Validate required fields
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Title is required' },
+        { success: false, error: 'Title is required', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
@@ -50,10 +61,15 @@ export async function POST(req: Request) {
     // Generate AI tags
     let aiTags: string[] = []
     try {
+      const tagIngredients = typeof ingredients === 'string'
+        ? ingredients
+        : Array.isArray(ingredients)
+          ? ingredients.flatMap((item) => typeof item === 'string' ? [item] : item.items)
+          : []
       aiTags = await generateTagsForRecipe({
         title: title.trim(),
-        ingredients: ingredients || [],
-        instructions: instructions || '',
+        ingredients: tagIngredients,
+        instructions: typeof instructions === 'string' ? instructions : JSON.stringify(instructions || []),
       })
     } catch (error) {
       // Log but don't fail - continue with user tags only
@@ -67,10 +83,10 @@ export async function POST(req: Request) {
     // Validate rating if provided
     let validatedRating: number | null = null
     if (rating !== undefined && rating !== null) {
-      const ratingNum = typeof rating === 'string' ? parseInt(rating, 10) : Number(rating)
+      const ratingNum = Number(rating)
       if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 10) {
         return NextResponse.json(
-          { success: false, error: 'Rating must be a number between 1 and 10' },
+          { success: false, error: 'Rating must be a number between 1 and 10', code: 'INVALID_REQUEST' },
           { status: 400 }
         )
       }
@@ -88,61 +104,27 @@ export async function POST(req: Request) {
     }
 
     // Insert into Supabase
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     
-    // Try to insert with created_by first, fallback without it if column doesn't exist
-    let data, error
-    if (userId && typeof userId === 'string') {
-      // Try with created_by
-      const result = await supabase
-        .from('recipes')
-        .insert({ ...recipeData, created_by: userId })
-        .select()
-        .single()
-      
-      data = result.data
-      error = result.error
-      
-      // If error is about missing column, retry without created_by
-      if (error && (error.message.includes('created_by') || error.message.includes('column') || error.code === '42703')) {
-        const retryResult = await supabase
-          .from('recipes')
-          .insert(recipeData)
-          .select()
-          .single()
-        
-        data = retryResult.data
-        error = retryResult.error
-      }
-    } else {
-      // No userId, insert without created_by
-      const result = await supabase
-        .from('recipes')
-        .insert(recipeData)
-        .select()
-        .single()
-      
-      data = result.data
-      error = result.error
-    }
+    const { data, error } = await supabase
+      .from('recipes')
+      .insert({ ...recipeData, created_by: profileId })
+      .select()
+      .single()
 
     if (error) {
       console.error('Supabase insert error:', error)
       return NextResponse.json(
-        { success: false, error: `Database error: ${error.message}` },
+        { success: false, error: 'Could not create recipe', code: 'DATABASE_ERROR' },
         { status: 500 }
       )
     }
 
     return NextResponse.json(
-      { success: true, data },
+      { success: true, data: await toRecipeResponse(supabase, data as Record<string, unknown>) },
       { status: 201 }
     )
   } catch (error) {
-    console.error('Unexpected error:', error)
-    return NextResponse.json(
-      { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }

@@ -2,6 +2,13 @@
   "name": "cookiejar",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.18.1",
+    "npm": ">=10"
+  },
+  "overrides": {
+    "undici": "7.29.0"
+  },
   "scripts": {
     "dev": "NEXT_FORCE_WEBPACK=1 next dev",
     "build": "NEXT_FORCE_WEBPACK=1 next build",
@@ -13,22 +20,25 @@
     "report:highlights": "tsx scripts/report_highlight_gaps.ts",
     "label:highlights": "tsx scripts/label_highlights.ts",
     "eval:highlights": "tsx scripts/eval_highlights.ts",
+    "eval:recipe-tags": "tsx scripts/eval_recipe_tagging.ts",
     "import:highlights": "tsx scripts/import_highlight_recipes.ts",
     "train:highlights": "tsx scripts/train_highlight_model.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.81.1",
-    "@vercel/analytics": "^1.5.0",
-    "@vis.gl/react-google-maps": "^1.7.1",
-    "cheerio": "^1.1.2",
-    "dotenv": "^17.2.3",
-    "next": "^16.1.1",
-    "next-themes": "^0.4.6",
-    "openai": "^6.9.0",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "sharp": "^0.34.5",
-    "zod": "^4.1.12"
+    "@supabase/ssr": "0.12.4",
+    "@supabase/supabase-js": "2.112.3",
+    "@vercel/analytics": "1.5.0",
+    "@vis.gl/react-google-maps": "1.7.1",
+    "cheerio": "1.1.2",
+    "dotenv": "17.2.3",
+    "next": "16.3.2",
+    "next-themes": "0.4.6",
+    "openai": "6.49.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "0.0.1",
+    "sharp": "0.35.3",
+    "zod": "4.1.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -37,10 +47,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.0.3",
+    "eslint-config-next": "16.3.2",
     "tailwindcss": "^4",
     "tsx": "^4.19.2",
     "typescript": "^5",
-    "vitest": "^4.0.13"
+    "vitest": "4.1.11"
   }
 }

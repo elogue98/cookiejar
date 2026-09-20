@@ -14,6 +14,7 @@ export interface Recipe {
   rating: number | null
   tags: string[] | null
   ingredients: (string | IngredientGroup)[] | null
+  image_path?: string | null
   image_url: string | null
   instructions: string | InstructionGroup[] | null
   created_at: string | null
@@ -40,4 +41,3 @@ export interface Recipe {
   fat_grams?: number | null
   carbs_grams?: number | null
 }
-

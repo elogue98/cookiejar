@@ -1,24 +1,22 @@
-import { supabase } from '@/lib/supabaseClient'
+import { requireFamilyPage } from '@/lib/serverPageAuth'
+import { createServerClient } from '@/lib/supabase/server'
 import HomePageContent from './components/HomePageContent'
 import type { Recipe } from '@/types/recipe'
+import { createSignedRecipeImageUrl } from '@/lib/imageUrls'
 
 export const revalidate = 0
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
+  await requireFamilyPage()
+  const supabase = await createServerClient()
   const { data: recipes, error } = await supabase
     .from('recipes')
     .select('*')
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching recipes:', {
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      code: error.code,
-      fullError: JSON.stringify(error, null, 2)
-    })
+    console.error('Error fetching recipes:', { code: error.code })
   }
 
   // Fetch all ratings for all recipes in one query
@@ -86,23 +84,30 @@ export default async function Home() {
   }
 
   // Map recipes with average ratings and creator info
-  const recipesWithAverageRatings: Recipe[] = recipeList.map((recipe) => {
+  const recipesWithAverageRatings: Recipe[] = await Promise.all(recipeList.map(async (recipe) => {
     const averageRating = averageRatingsMap[recipe.id] ?? recipe.rating
     const createdBy = recipe.created_by
     const creator = createdBy && creatorsMap[createdBy] ? creatorsMap[createdBy] : null
+    let imageUrl: string | null = null
+    if (recipe.image_path) {
+      try {
+        imageUrl = await createSignedRecipeImageUrl(supabase, recipe.image_path)
+      } catch {
+        imageUrl = null
+      }
+    }
     
     return {
       ...recipe,
+      image_url: imageUrl,
       rating: averageRating,
       created_by: createdBy || null,
       creator: creator
     }
-  })
+  }))
 
-  const errorMessage = error?.message ?? null
-  const errorHint = error
-    ? error.hint || 'Please check your Supabase connection and ensure the "recipes" table exists.'
-    : null
+  const errorMessage = error ? 'Unable to load recipes right now.' : null
+  const errorHint = null
 
   return (
     <HomePageContent

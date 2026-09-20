@@ -31,14 +31,14 @@ export default function PlaceStarRating({ placeId, initialAverage, onRated }: Pl
 
   useEffect(() => {
     async function fetchRatings() {
-      if (!user?.id) {
+      if (!user) {
         setAverageRating(initialAverage)
         setIsLoading(false)
         return
       }
 
       try {
-        const res = await fetch(`/api/places/${placeId}/ratings?userId=${user.id}`)
+        const res = await fetch(`/api/places/${placeId}/ratings`)
         const data: RatingsResponse = await res.json()
 
         if (res.ok && data.success && data.data) {
@@ -56,11 +56,11 @@ export default function PlaceStarRating({ placeId, initialAverage, onRated }: Pl
     }
 
     fetchRatings()
-  }, [placeId, user?.id, initialAverage])
+  }, [placeId, user, initialAverage])
 
   const handleStarClick = async (selectedRating: number) => {
-    if (isUpdating || !user?.id) {
-      if (!user?.id) {
+    if (isUpdating || !user) {
+      if (!user) {
         alert('Please log in to rate places')
       }
       return
@@ -75,10 +75,7 @@ export default function PlaceStarRating({ placeId, initialAverage, onRated }: Pl
       const res = await fetch(`/api/places/${placeId}/ratings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          rating: selectedRating,
-        }),
+        body: JSON.stringify({ rating: selectedRating }),
       })
 
       const data: RatingsResponse = await res.json()
@@ -153,4 +150,3 @@ export default function PlaceStarRating({ placeId, initialAverage, onRated }: Pl
     </div>
   )
 }
-

@@ -1,4 +1,5 @@
 import sharp from 'sharp'
+import { validateUploadedImage } from './imageValidation'
 
 /**
  * Optimizes an image buffer by:
@@ -9,8 +10,9 @@ import sharp from 'sharp'
  * @param buffer - Original image buffer
  * @returns Optimized image buffer
  */
-export async function optimizeImage(buffer: Buffer): Promise<Buffer> {
+export async function optimizeImage(buffer: Buffer, declaredMime?: string): Promise<Buffer> {
   try {
+    await validateUploadedImage(buffer, declaredMime)
     const optimized = await sharp(buffer)
       .rotate() // Auto-fix EXIF orientation
       .resize({ width: 1500, withoutEnlargement: true })
@@ -31,18 +33,18 @@ export async function optimizeImage(buffer: Buffer): Promise<Buffer> {
  * @param imageBuffer - Original image buffer (will be optimized before upload)
  * @param recipeId - Recipe ID for file naming
  * @param originalExtension - Original file extension (for cleanup if needed)
- * @returns Public URL of the uploaded optimized image, or null if upload fails
+ * @returns Private storage path of the uploaded optimized image, or null if upload fails
  */
 export async function uploadOptimizedImage(
-  supabase: ReturnType<typeof import('./supabaseClient').createServerClient>,
+  supabase: Awaited<ReturnType<typeof import('./supabase/server').createServerClient>>,
   imageBuffer: Buffer,
   recipeId: string,
-  originalExtension?: string
+  originalExtension?: string,
+  declaredMime?: string,
 ): Promise<string | null> {
   try {
     // Optimize the image
-    const optimizedBuffer = await optimizeImage(imageBuffer)
-    const cacheBuster = Date.now().toString()
+    const optimizedBuffer = await optimizeImage(imageBuffer, declaredMime)
     
     // Use optimized filename: recipeId-optimized.jpg
     const optimizedPath = `recipes/${recipeId}-optimized.jpg`
@@ -63,16 +65,6 @@ export async function uploadOptimizedImage(
       return null
     }
     
-    // Get public URL for optimized image
-    const { data: urlData } = supabase.storage
-      .from('recipe-images')
-      .getPublicUrl(optimizedPath)
-    
-    const optimizedUrl = urlData.publicUrl
-    const cacheSafeUrl = optimizedUrl.includes('?')
-      ? `${optimizedUrl}&v=${cacheBuster}`
-      : `${optimizedUrl}?v=${cacheBuster}`
-    
     // Delete original file if it exists and is different from optimized
     if (originalPath && originalPath !== optimizedPath) {
       try {
@@ -85,11 +77,10 @@ export async function uploadOptimizedImage(
       }
     }
     
-    // Return URL with cache buster so clients fetch the fresh image
-    return cacheSafeUrl
+    // The bucket is private; callers sign this path for authenticated responses.
+    return optimizedPath
   } catch (error) {
     console.error('Error in uploadOptimizedImage:', error)
     return null
   }
 }
-

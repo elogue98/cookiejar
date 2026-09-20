@@ -1,10 +1,23 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabaseClient'
+import { createServerClient } from '@/lib/supabase/server'
+import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
+import { RATE_LIMITS } from '@/lib/rateLimit'
 import { uploadOptimizedImage } from '@/lib/imageOptimization'
+import { createSignedRecipeImageUrl } from '@/lib/imageUrls'
+import { toRecipeResponse } from '@/lib/recipeResponses'
+import { validateUploadedImage } from '@/lib/imageValidation'
+import { apiErrorResponse } from '@/lib/apiErrors'
 import {
   normalizeIngredientSections,
   normalizeInstructionSections,
 } from '@/lib/recipeFormatting'
+import {
+  assertRequestContentLength,
+  imageFinalizeRequestSchema,
+  MAX_BASE64_IMAGE_CHARS,
+  MAX_IMAGE_FINALIZE_BODY_BYTES,
+  parseJsonRequest,
+} from '@/lib/validation'
 
 type NormalizedIngredients = Awaited<ReturnType<typeof normalizeIngredientSections>>
 type NormalizedInstructions = ReturnType<typeof normalizeInstructionSections>
@@ -49,8 +62,15 @@ type RecipeInsertPayload = {
  * Returns: { success: boolean, data?: Recipe, error?: string }
  */
 export async function POST(req: Request) {
+  const auth = await authenticateApiRequest(req, { stateChanging: true })
+  if (auth.error) return auth.error
+  const profileId = auth.profile!.profileId
+  const rateLimitError = await checkApiRateLimit(profileId, 'imports', RATE_LIMITS.imports)
+  if (rateLimitError) return rateLimitError
+
   try {
-    const body = await req.json()
+    assertRequestContentLength(req, MAX_IMAGE_FINALIZE_BODY_BYTES)
+    const body = await parseJsonRequest(req, imageFinalizeRequestSchema, MAX_IMAGE_FINALIZE_BODY_BYTES)
     const {
       title,
       ingredients,
@@ -60,7 +80,6 @@ export async function POST(req: Request) {
       metadataNotes,
       imageBuffer,
       imageMimeType,
-      userId,
       ingredientSections,
       instructionSections,
       // Metadata fields
@@ -88,15 +107,32 @@ export async function POST(req: Request) {
     // Validate required fields
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Title is required' },
+        { success: false, error: 'Title is required', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
 
     if (!imageBuffer || !imageMimeType) {
       return NextResponse.json(
-        { success: false, error: 'Image data is required' },
+        { success: false, error: 'Image data is required', code: 'INVALID_REQUEST' },
         { status: 400 }
+      )
+    }
+
+    if (imageBuffer.length > MAX_BASE64_IMAGE_CHARS || !isCanonicalBase64(imageBuffer)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid image data', code: 'INVALID_IMAGE' },
+        { status: 400 },
+      )
+    }
+
+    try {
+      await validateUploadedImage(Buffer.from(imageBuffer, 'base64'), imageMimeType)
+    } catch (error) {
+      const tooLarge = error instanceof Error && /too large/i.test(error.message)
+      return NextResponse.json(
+        { success: false, error: tooLarge ? 'Image is too large' : 'Invalid image', code: tooLarge ? 'PAYLOAD_TOO_LARGE' : 'INVALID_IMAGE' },
+        { status: tooLarge ? 413 : 400 },
       )
     }
 
@@ -164,52 +200,18 @@ export async function POST(req: Request) {
     })
 
     // Insert into Supabase
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
     
-    // Try to insert with created_by first, fallback without it if column doesn't exist
-    let data, error
-    if (userId && typeof userId === 'string') {
-      // Try with created_by
-      const result = await supabase
-        .from('recipes')
-        .insert({ ...recipeData, created_by: userId })
-        .select()
-        .single()
-      
-      data = result.data
-      error = result.error
-      
-      // If error is about missing column, retry without created_by
-      if (error && (error.message.includes('created_by') || error.message.includes('column') || error.code === '42703')) {
-        const retryResult = await supabase
-          .from('recipes')
-          .insert(recipeData)
-          .select()
-          .single()
-        
-        data = retryResult.data
-        error = retryResult.error
-      }
-    } else {
-      // No userId, insert without created_by
-      const result = await supabase
-        .from('recipes')
-        .insert(recipeData)
-        .select()
-        .single()
-      
-      data = result.data
-      error = result.error
-    }
+    const { data, error } = await supabase
+      .from('recipes')
+      .insert({ ...recipeData, created_by: profileId })
+      .select()
+      .single()
 
     if (error) {
-      console.error('Supabase insert error:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-      })
+      console.error('Supabase insert failed', { code: error.code })
       return NextResponse.json(
-        { success: false, error: error.details || error.message || 'Database insert failed' },
+        { success: false, error: 'Could not save imported recipe', code: 'DATABASE_ERROR' },
         { status: 500 }
       )
     }
@@ -232,16 +234,17 @@ export async function POST(req: Request) {
         }
 
         // Upload optimized image (utility handles optimization and cleanup)
-        finalImageUrl = await uploadOptimizedImage(supabase, buffer, data.id, extension)
+        finalImageUrl = await uploadOptimizedImage(supabase, buffer, data.id, extension, imageMimeType)
 
         if (finalImageUrl) {
           const { error: updateError } = await supabase
             .from('recipes')
-            .update({ image_url: finalImageUrl })
+            .update({ image_path: finalImageUrl })
             .eq('id', data.id)
 
           if (!updateError) {
-            data.image_url = finalImageUrl
+            data.image_path = finalImageUrl
+            data.image_url = await createSignedRecipeImageUrl(supabase, finalImageUrl)
           }
         }
       } catch (imageError) {
@@ -251,15 +254,15 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      { success: true, data },
+      { success: true, data: await toRecipeResponse(supabase, data as Record<string, unknown>) },
       { status: 201 }
     )
   } catch (error) {
     console.error('Unexpected error:', error)
-    return NextResponse.json(
-      { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }
 
+function isCanonicalBase64(value: string): boolean {
+  return value.length % 4 === 0 && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)
+}

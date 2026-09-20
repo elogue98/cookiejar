@@ -10,7 +10,7 @@ import { useUser } from '@/lib/userContext'
 
 export default function Navigation({ forceTheme }: { forceTheme?: string }) {
   const router = useRouter()
-  const { user, logoutUser } = useUser()
+  const { user, isLoading, logoutUser } = useUser()
   const { theme, setTheme } = useTheme()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
@@ -21,6 +21,12 @@ export default function Navigation({ forceTheme }: { forceTheme?: string }) {
       setTheme(forceTheme)
     }
   }, [forceTheme, theme, setTheme])
+
+  useEffect(() => {
+    if (!isLoading && !user && window.location.pathname !== '/login') {
+      router.replace('/login')
+    }
+  }, [isLoading, router, user])
 
   const currentTheme = forceTheme || theme || 'cookie'
   const isTipJar = currentTheme === 'tipjar'
@@ -46,7 +52,7 @@ export default function Navigation({ forceTheme }: { forceTheme?: string }) {
   const handleLogout = () => {
     logoutUser()
     setUserDropdownOpen(false)
-    router.push('/login')
+    router.replace('/login')
   }
 
   const modePrimaryColor = isTipJar ? '#3B82F6' : isMealJar ? '#16A34A' : '#D34E4E'

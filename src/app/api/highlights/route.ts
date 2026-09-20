@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import fs from 'node:fs'
 import path from 'node:path'
+import { z } from 'zod'
+import { authenticateApiRequest } from '@/lib/apiSecurity'
+import { apiErrorResponse } from '@/lib/apiErrors'
+import { assertRequestContentLength, parseJsonRequest } from '@/lib/validation'
+import { isTrainingEnabled } from '@/lib/trainingAvailability'
 
 const DATASET_DIR = path.join(process.cwd(), 'data/ingredient_highlights')
 
@@ -11,6 +16,20 @@ type HighlightDataset = {
   instructions: unknown
   expectedMatches?: Record<string, string[]>
 }
+
+const expectedMatchesSchema = z.record(
+  z.string().trim().min(1).max(100),
+  z.array(z.string().trim().min(1).max(100)).max(200),
+).superRefine((value, context) => {
+  if (Object.keys(value).length > 2_000) {
+    context.addIssue({ code: 'custom', message: 'Too many expected matches' })
+  }
+})
+
+const highlightUpdateSchema = z.object({
+  id: z.string().trim().min(1).max(200),
+  expectedMatches: expectedMatchesSchema,
+}).strict()
 
 function listDatasetFiles(): string[] {
   if (!fs.existsSync(DATASET_DIR)) return []
@@ -55,6 +74,12 @@ function findDatasetPathById(id: string): string | null {
 }
 
 export async function GET(req: Request) {
+  if (!isTrainingEnabled()) {
+    return NextResponse.json({ success: false, error: 'Not found', code: 'NOT_FOUND' }, { status: 404 })
+  }
+  const auth = await authenticateApiRequest(req)
+  if (auth.error) return auth.error
+
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
 
@@ -73,31 +98,31 @@ export async function GET(req: Request) {
 
   const targetPath = findDatasetPathById(id)
   if (!targetPath) {
-    return NextResponse.json({ error: 'Dataset not found' }, { status: 404 })
+    return NextResponse.json({ success: false, error: 'Dataset not found', code: 'NOT_FOUND' }, { status: 404 })
   }
 
   try {
     const payload = readDataset(targetPath)
     return NextResponse.json(payload)
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 })
+    return apiErrorResponse(error)
   }
 }
 
 export async function POST(req: Request) {
+  if (!isTrainingEnabled()) {
+    return NextResponse.json({ success: false, error: 'Not found', code: 'NOT_FOUND' }, { status: 404 })
+  }
+  const auth = await authenticateApiRequest(req, { stateChanging: true })
+  if (auth.error) return auth.error
+
   try {
-    const body = await req.json()
-    const { id, expectedMatches } = body as { id?: string; expectedMatches?: Record<string, string[]> }
-    if (!id || typeof id !== 'string') {
-      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
-    }
-    if (!expectedMatches || typeof expectedMatches !== 'object') {
-      return NextResponse.json({ error: 'expectedMatches required' }, { status: 400 })
-    }
+    assertRequestContentLength(req, 1 * 1024 * 1024)
+    const { id, expectedMatches } = await parseJsonRequest(req, highlightUpdateSchema, 1 * 1024 * 1024)
 
     const targetPath = findDatasetPathById(id)
     if (!targetPath) {
-      return NextResponse.json({ error: 'Dataset not found' }, { status: 404 })
+      return NextResponse.json({ success: false, error: 'Dataset not found', code: 'NOT_FOUND' }, { status: 404 })
     }
 
     const payload = readDataset(targetPath)
@@ -105,8 +130,8 @@ export async function POST(req: Request) {
     fs.writeFileSync(targetPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf-8')
     appendLog(payload.id)
 
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ success: true })
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 })
+    return apiErrorResponse(error)
   }
 }

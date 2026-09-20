@@ -2,6 +2,7 @@
 
 import { aiComplete } from './ai'
 import { mapPlaceTypesToTags } from './googlePlaces'
+import { PLACE_TAGS_JSON_SCHEMA, tagsOutputSchema } from './aiSchemas'
 
 type PlaceTagInput = {
   name: string
@@ -73,8 +74,6 @@ function keywordFallback(input: PlaceTagInput): string[] {
     .slice(0, 8)
 }
 
-const isRecord = (val: unknown): val is Record<string, unknown> => typeof val === 'object' && val !== null
-
 export async function generateTagsForPlace(input: PlaceTagInput): Promise<string[]> {
   const name = input.name?.trim()
   if (!name) return []
@@ -105,7 +104,14 @@ Types: ${(input.types ?? []).join(', ') || 'n/a'}`.trim()
         },
         { role: 'user', content: prompt },
       ],
-      { temperature: 0.2, max_tokens: 120, response_format: { type: 'json_object' } }
+      {
+        temperature: 0.2,
+        max_tokens: 120,
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'place_tags', strict: true, schema: PLACE_TAGS_JSON_SCHEMA },
+        },
+      }
     )
 
     let parsed: unknown
@@ -116,16 +122,10 @@ Types: ${(input.types ?? []).join(', ') || 'n/a'}`.trim()
       return keywordFallback(input)
     }
 
-    let tags: unknown[] = []
-    if (Array.isArray(parsed)) {
-      tags = parsed
-    } else if (isRecord(parsed) && Array.isArray(parsed.tags)) {
-      tags = parsed.tags
-    }
+    const validated = tagsOutputSchema.safeParse(parsed)
+    if (!validated.success) return keywordFallback(input)
 
-    const cleaned = tags
-      .map((t) => (typeof t === 'string' ? t : null))
-      .filter((t): t is string => Boolean(t))
+    const cleaned = validated.data.tags
       .map((t) => t.toLowerCase().trim().replace(/\s+/g, ' '))
       .filter((t) => t && t.length <= 30 && t.split(/\s+/).length <= 2)
 
@@ -141,4 +141,3 @@ Types: ${(input.types ?? []).join(', ') || 'n/a'}`.trim()
     return keywordFallback(input)
   }
 }
-

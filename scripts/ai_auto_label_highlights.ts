@@ -15,6 +15,7 @@ import path from 'node:path'
 import process from 'node:process'
 
 import { aiComplete } from '../src/lib/ai'
+import { EXPECTED_MATCHES_JSON_SCHEMA, expectedMatchesOutputSchema } from '../src/lib/aiSchemas'
 
 type IngredientGroup = { section?: string; items: string[] }
 type InstructionGroup = { section?: string; steps: string[] }
@@ -90,17 +91,28 @@ async function labelFile(filePath: string) {
       {
         role: 'system',
         content:
-          'You are an ingredient-to-step tagger. Return only valid JSON mapping step ids to ingredient id arrays.',
+          'You are an ingredient-to-step tagger. Return a strict JSON object with a matches array. Each match contains stepId and ingredientIds.',
       },
       { role: 'user', content: prompt },
     ],
-    { temperature: 0, response_format: { type: 'json_object' } },
+    {
+      temperature: 0,
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'expected_matches', strict: true, schema: EXPECTED_MATCHES_JSON_SCHEMA },
+      },
+    },
   )
 
   let mapping: Record<string, string[]> = {}
   try {
-    const parsed = JSON.parse(response)
-    mapping = parsed
+    const parsed = expectedMatchesOutputSchema.parse(JSON.parse(response))
+    if (parsed.matches.length > 0) {
+      mapping = parsed.matches.reduce<Record<string, string[]>>((result, match) => {
+        result[match.stepId] = match.ingredientIds
+        return result
+      }, {})
+    }
   } catch (err) {
     console.warn(`Failed to parse AI response for ${path.basename(filePath)}: ${(err as Error).message}`)
     return

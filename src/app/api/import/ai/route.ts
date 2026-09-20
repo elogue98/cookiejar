@@ -1,7 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, prefer-const */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createServerClient } from '@/lib/supabaseClient'
+import { createServerClient } from '@/lib/supabase/server'
+import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
+import { RATE_LIMITS } from '@/lib/rateLimit'
 import { uploadOptimizedImage } from '@/lib/imageOptimization'
 import { aiComplete } from '@/lib/ai'
 import { ensureMetadataCompleteness } from '@/lib/metadataCompletion'
@@ -11,12 +13,40 @@ import {
   formatMetadataForNotes,
 } from '@/lib/recipeFormatting'
 import { generateTagsForRecipe } from '@/lib/aiTagging'
+import { safeFetchImage, safeFetchText } from '@/lib/safeFetch'
+import { createSignedRecipeImageUrl } from '@/lib/imageUrls'
+import { toRecipeResponse } from '@/lib/recipeResponses'
+import { ApiError, apiErrorResponse } from '@/lib/apiErrors'
+import {
+  assertRequestContentLength,
+  assertTextLimit,
+  MAX_AI_TEXT_CHARS,
+  MAX_HTML_BYTES,
+  httpUrlSchema,
+  parseJsonBody,
+  parseFormDataRequest,
+  parseJsonRequest,
+} from '@/lib/validation'
+import { MAX_IMAGE_BYTES, validateUploadedImage } from '@/lib/imageValidation'
+import {
+  EXPECTED_MATCHES_JSON_SCHEMA,
+  RECIPE_EXTRACTION_JSON_SCHEMA,
+  expectedMatchesOutputSchema,
+  recipeExtractionOutputSchema,
+  type RecipeExtractionOutput,
+} from '@/lib/aiSchemas'
 import OpenAI from 'openai'
 import * as cheerio from 'cheerio'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 })
+
+const aiImportJsonSchema = z.object({
+  url: httpUrlSchema.optional().nullable(),
+  html: z.string().max(MAX_HTML_BYTES).optional().nullable(),
+  text: z.string().max(MAX_AI_TEXT_CHARS).optional().nullable(),
+}).strict()
 
 type StructuredListSection = {
   section?: string | null
@@ -110,16 +140,25 @@ Output format example:
         {
           role: 'system',
           content:
-            'You are an ingredient-to-step tagger. Return only valid JSON mapping step ids to ingredient id arrays.',
+            'You are an ingredient-to-step tagger. Return a strict JSON object with a matches array. Each match contains stepId and ingredientIds.',
         },
         { role: 'user', content: prompt },
       ],
-      { temperature: 0, response_format: { type: 'json_object' } },
+      {
+        temperature: 0,
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'expected_matches', strict: true, schema: EXPECTED_MATCHES_JSON_SCHEMA },
+        },
+      },
     )
 
-    const parsed = JSON.parse(response)
-    if (parsed && typeof parsed === 'object') {
-      return parsed as ExpectedMatchMap
+    const parsed = expectedMatchesOutputSchema.parse(JSON.parse(response))
+    if (parsed.matches.length > 0) {
+      return parsed.matches.reduce<ExpectedMatchMap>((result, match) => {
+        result[match.stepId] = match.ingredientIds
+        return result
+      }, {})
     }
   } catch (err) {
     console.warn('[import/ai] AI expectedMatches generation failed:', err)
@@ -660,35 +699,7 @@ export function extractStructuredRecipeDataFromHTML(html: string): WprmStructure
 /**
  * Zod schema for AI-extracted recipe structure
  */
-const RecipeExtractionSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().optional().nullable(),
-  sourceUrl: z.string().url().optional().nullable(),
-  image: z.string().url().optional().nullable(),
-  servings: z.number().int().positive().optional().nullable(),
-  prepTime: z.string().optional().nullable(), // e.g., "15 minutes", "PT15M"
-  cookTime: z.string().optional().nullable(),
-  totalTime: z.string().optional().nullable(),
-  cuisine: z.string().optional().nullable(),
-  mealType: z.string().optional().nullable(), // e.g., "breakfast", "dinner", "dessert"
-  nutrition: z.object({
-    calories: z.number().int().nonnegative().optional().nullable(),
-    protein: z.number().nonnegative().optional().nullable(), // in grams
-    fat: z.number().nonnegative().optional().nullable(), // in grams
-    carbs: z.number().nonnegative().optional().nullable(), // in grams
-  }).optional().nullable(),
-  ingredientSections: z.array(z.object({
-    section: z.string().optional().nullable(),
-    items: z.array(z.string().min(1)),
-  })).min(1, 'At least one ingredient section is required'),
-  instructionSections: z.array(z.object({
-    section: z.string().optional().nullable(),
-    steps: z.array(z.string().min(1)),
-  })).min(1, 'At least one instruction section is required'),
-  tags: z.array(z.string()).optional().nullable(),
-})
-
-type RecipeExtraction = z.infer<typeof RecipeExtractionSchema>
+type RecipeExtraction = RecipeExtractionOutput
 
 /**
  * Extract image URL from HTML (similar to old scraper)
@@ -1489,7 +1500,10 @@ ${content.substring(0, 8000)}`
     {
       temperature: 0.2, // Low temperature for consistent extraction
       max_tokens: 4000, // Enough for full recipe
-      response_format: { type: 'json_object' },
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'recipe_extraction', strict: true, schema: RECIPE_EXTRACTION_JSON_SCHEMA },
+      },
     }
   )
 
@@ -1521,25 +1535,59 @@ ${content.substring(0, 8000)}`
     throw new Error('AI response must be a JSON object')
   }
 
+  const normalizeSections = (value: unknown): unknown => {
+    if (!Array.isArray(value)) return value
+    return value.map((section) => {
+      if (!isObject(section)) return section
+      return {
+        ...section,
+        section: typeof section.section === 'string' ? section.section : null,
+      }
+    })
+  }
+
+  const parsedWithDefaults = {
+    ...parsed,
+    description: parsed.description ?? null,
+    sourceUrl: parsed.sourceUrl ?? null,
+    image: parsed.image ?? null,
+    servings: parsed.servings ?? null,
+    prepTime: parsed.prepTime ?? null,
+    cookTime: parsed.cookTime ?? null,
+    totalTime: parsed.totalTime ?? null,
+    cuisine: parsed.cuisine ?? null,
+    mealType: parsed.mealType ?? null,
+    nutrition: parsed.nutrition ?? null,
+    ingredientSections: normalizeSections(parsed.ingredientSections),
+    instructionSections: normalizeSections(parsed.instructionSections),
+    tags: parsed.tags ?? null,
+  }
+
   const parsedWithStructuredData = structuredData
     ? {
-        ...parsed,
+        ...parsedWithDefaults,
         ...(structuredData.ingredientSections.length > 0
-          ? { ingredientSections: structuredData.ingredientSections }
+          ? { ingredientSections: normalizeSections(structuredData.ingredientSections) }
           : {}),
         ...(structuredData.instructionSections.length > 0
-          ? { instructionSections: structuredData.instructionSections }
+          ? { instructionSections: normalizeSections(structuredData.instructionSections) }
           : {}),
       }
-    : parsed
+    : parsedWithDefaults
 
   // Validate with zod schema
-  const validated = RecipeExtractionSchema.parse(parsedWithStructuredData)
+  const validated = recipeExtractionOutputSchema.parse(parsedWithStructuredData)
 
   // Ensure metadata completeness (servings, times, nutrition)
   const enriched = await ensureMetadataCompleteness(validated, content)
+  const withoutEmptySections = <T extends { section: string | null }>(sections: T[]) =>
+    sections.map(({ section, ...rest }) => section ? { section, ...rest } : rest)
 
-  return enriched
+  return {
+    ...enriched,
+    ingredientSections: withoutEmptySections(enriched.ingredientSections),
+    instructionSections: withoutEmptySections(enriched.instructionSections),
+  } as RecipeExtraction
 }
 
 /**
@@ -1558,29 +1606,58 @@ ${content.substring(0, 8000)}`
  * - text: string (pasted text)
  */
 export async function POST(req: Request) {
+  const auth = await authenticateApiRequest(req, { stateChanging: true })
+  if (auth.error) return auth.error
+  const profileId = auth.profile!.profileId
+  const rateLimitError = await checkApiRateLimit(profileId, 'imports', RATE_LIMITS.imports)
+  if (rateLimitError) return rateLimitError
+
   try {
+    assertRequestContentLength(req, 12 * 1024 * 1024)
     const contentType = req.headers.get('content-type') || ''
     let url: string | null = null
     let html: string | null = null
     let text: string | null = null
     let imageFile: File | null = null
-    let userId: string | null = null
 
     if (contentType.includes('multipart/form-data')) {
       // Handle FormData (for file uploads)
-      const formData = await req.formData()
-      url = formData.get('url') as string | null
-      html = formData.get('html') as string | null
-      text = formData.get('text') as string | null
-      imageFile = formData.get('image') as File | null
-      userId = formData.get('userId') as string | null
+      const formData = await parseFormDataRequest(req, 12 * 1024 * 1024)
+      const allowedFields = new Set(['url', 'html', 'text', 'image'])
+      for (const key of formData.keys()) {
+        if (!allowedFields.has(key)) {
+          return NextResponse.json(
+            { success: false, error: 'Invalid request payload', code: 'INVALID_REQUEST' },
+            { status: 400 },
+          )
+        }
+      }
+      const rawUrl = formData.get('url')
+      const rawHtml = formData.get('html')
+      const rawText = formData.get('text')
+      const rawImage = formData.get('image')
+      if (
+        (rawUrl !== null && typeof rawUrl !== 'string') ||
+        (rawHtml !== null && typeof rawHtml !== 'string') ||
+        (rawText !== null && typeof rawText !== 'string') ||
+        (rawImage !== null && !(rawImage instanceof File))
+      ) {
+        throw new ApiError(400, 'INVALID_REQUEST', 'Invalid request payload')
+      }
+      const formFields = parseJsonBody(
+        { url: rawUrl, html: rawHtml, text: rawText },
+        aiImportJsonSchema,
+      )
+      url = formFields.url ?? null
+      html = formFields.html ?? null
+      text = formFields.text ?? null
+      imageFile = rawImage instanceof File ? rawImage : null
     } else {
       // Handle JSON
-      const body = await req.json()
-      url = body.url || null
-      html = body.html || null
-      text = body.text || null
-      userId = body.userId || null
+      const body = await parseJsonRequest(req, aiImportJsonSchema, 12 * 1024 * 1024)
+      url = body.url ?? null
+      html = body.html ?? null
+      text = body.text ?? null
     }
 
     // Determine content source
@@ -1594,20 +1671,8 @@ export async function POST(req: Request) {
     if (url) {
       // Fetch HTML from URL
       try {
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent': 'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)'
-          }
-        })
-
-        if (!response.ok) {
-          return NextResponse.json(
-            { success: false, error: `Failed to fetch URL: ${response.status} ${response.statusText}` },
-            { status: response.status }
-          )
-        }
-
-        const htmlContent = await response.text()
+        const response = await safeFetchText(url)
+        const htmlContent = response.text
         structuredRecipeData = extractStructuredRecipeDataFromHTML(htmlContent)
         content = extractTextFromHTML(htmlContent)
         contentSourceType = 'html'
@@ -1620,22 +1685,35 @@ export async function POST(req: Request) {
         }
       } catch (error) {
         return NextResponse.json(
-          { success: false, error: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}` },
-          { status: 500 }
+          { success: false, error: 'Could not fetch the source URL', code: 'REMOTE_FETCH_FAILED' },
+          { status: 502 }
         )
       }
     } else if (html) {
       // Use provided HTML
+      if (Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
+        return NextResponse.json(
+          { success: false, error: 'HTML payload is too large', code: 'PAYLOAD_TOO_LARGE' },
+          { status: 413 },
+        )
+      }
       structuredRecipeData = extractStructuredRecipeDataFromHTML(html)
       content = extractTextFromHTML(html)
       contentSourceType = 'html'
     } else if (imageFile) {
       // Extract text from image using OpenAI Vision
       try {
+        if (imageFile.size > MAX_IMAGE_BYTES) {
+          return NextResponse.json(
+            { success: false, error: 'Image is too large', code: 'PAYLOAD_TOO_LARGE' },
+            { status: 413 },
+          )
+        }
         const arrayBuffer = await imageFile.arrayBuffer()
         const buffer = Buffer.from(arrayBuffer)
         const base64Image = buffer.toString('base64')
         const mimeType = imageFile.type || 'image/jpeg'
+        await validateUploadedImage(buffer, mimeType)
 
         // Use OpenAI Vision API directly (aiComplete doesn't support images)
         const visionResponse = await openai.chat.completions.create({
@@ -1669,7 +1747,7 @@ export async function POST(req: Request) {
 
         if (!visionText) {
           return NextResponse.json(
-            { success: false, error: 'Failed to extract text from image' },
+            { success: false, error: 'Failed to extract text from image', code: 'OCR_FAILED' },
             { status: 500 }
           )
         }
@@ -1679,8 +1757,8 @@ export async function POST(req: Request) {
         imageBuffer = buffer // Store for later upload
       } catch (error) {
         return NextResponse.json(
-          { success: false, error: `Error processing image: ${error instanceof Error ? error.message : 'Unknown error'}` },
-          { status: 500 }
+          { success: false, error: 'Could not process the image', code: 'IMAGE_PROCESSING_FAILED' },
+          { status: 400 }
         )
       }
     } else if (text) {
@@ -1689,17 +1767,19 @@ export async function POST(req: Request) {
       contentSourceType = 'text'
     } else {
       return NextResponse.json(
-        { success: false, error: 'One of url, html, text, or image must be provided' },
+        { success: false, error: 'One of url, html, text, or image must be provided', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
 
     if (!content || content.trim().length === 0) {
       return NextResponse.json(
-        { success: false, error: 'No content extracted from provided source' },
+        { success: false, error: 'No content extracted from provided source', code: 'EMPTY_CONTENT' },
         { status: 400 }
       )
     }
+
+    assertTextLimit(content, MAX_AI_TEXT_CHARS)
 
     // Extract recipe using AI
     let extractedRecipe: RecipeExtraction
@@ -1708,18 +1788,24 @@ export async function POST(req: Request) {
     } catch (error) {
       console.error('Error extracting recipe with AI:', error)
       return NextResponse.json(
-        { success: false, error: `Failed to extract recipe: ${error instanceof Error ? error.message : 'Unknown error'}` },
-        { status: 500 }
+        { success: false, error: 'Could not extract a recipe from the source', code: 'AI_EXTRACTION_FAILED' },
+        { status: 502 }
       )
     }
 
     if (structuredRecipeData) {
       const overrides: Partial<RecipeExtraction> = {}
       if (structuredRecipeData.ingredientSections.length > 0) {
-        overrides.ingredientSections = structuredRecipeData.ingredientSections
+        overrides.ingredientSections = structuredRecipeData.ingredientSections.map((section) => ({
+          section: section.section ?? null,
+          items: section.items,
+        }))
       }
       if (structuredRecipeData.instructionSections.length > 0) {
-        overrides.instructionSections = structuredRecipeData.instructionSections
+        overrides.instructionSections = structuredRecipeData.instructionSections.map((section) => ({
+          section: section.section ?? null,
+          steps: section.steps,
+        }))
       }
 
       if (Object.keys(overrides).length > 0) {
@@ -1811,72 +1897,35 @@ export async function POST(req: Request) {
     }
 
     // Insert into Supabase
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
-    // Try to insert with created_by first, fallback without it if column doesn't exist
-    let data, error
-    if (userId && typeof userId === 'string') {
-      // Try with created_by
-      let result = await supabase
+    let result = await supabase
+      .from('recipes')
+      .insert({ ...recipeData, created_by: profileId })
+      .select()
+      .single()
+    let data = result.data
+    let error = result.error
+
+    if (
+      error &&
+      (error.message.includes('expected_matches') || error.message.includes('column') || error.code === '42703')
+    ) {
+      const fallbackData = { ...recipeData }
+      delete (fallbackData as any).expected_matches
+      result = await supabase
         .from('recipes')
-        .insert({ ...recipeData, created_by: userId })
+        .insert({ ...fallbackData, created_by: profileId })
         .select()
         .single()
-
       data = result.data
       error = result.error
-
-      // If error is about missing column, retry without created_by or expected_matches
-      if (
-        error &&
-        (error.message.includes('created_by') ||
-          error.message.includes('expected_matches') ||
-          error.message.includes('column') ||
-          error.code === '42703')
-      ) {
-        const fallbackData = { ...recipeData }
-        delete (fallbackData as any).expected_matches
-        const retryResult = await supabase
-          .from('recipes')
-          .insert(fallbackData)
-          .select()
-          .single()
-
-        data = retryResult.data
-        error = retryResult.error
-      }
-    } else {
-      // No userId, insert without created_by
-      let result = await supabase
-        .from('recipes')
-        .insert(recipeData)
-        .select()
-        .single()
-
-      data = result.data
-      error = result.error
-
-      if (
-        error &&
-        (error.message.includes('expected_matches') || error.message.includes('column') || error.code === '42703')
-      ) {
-        const fallbackData = { ...recipeData }
-        delete (fallbackData as any).expected_matches
-        result = await supabase
-          .from('recipes')
-          .insert(fallbackData)
-          .select()
-          .single()
-
-        data = result.data
-        error = result.error
-      }
     }
 
     if (error) {
       console.error('Supabase insert error:', error)
       return NextResponse.json(
-        { success: false, error: `Database error: ${error.message}` },
+        { success: false, error: 'Could not save imported recipe', code: 'DATABASE_ERROR' },
         { status: 500 }
       )
     }
@@ -1890,19 +1939,13 @@ export async function POST(req: Request) {
     if (imageUrlToUse && data.id) {
       try {
         // Fetch image from URL
-        const imageResponse = await fetch(imageUrlToUse, {
-          headers: {
-            'User-Agent': 'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)'
-          }
-        })
-
-        if (imageResponse.ok) {
-          const imageArrayBuffer = await imageResponse.arrayBuffer()
-          const imageBuffer = Buffer.from(imageArrayBuffer)
+        const imageResponse = await safeFetchImage(imageUrlToUse)
+        {
+          const imageBuffer = Buffer.from(imageResponse.bytes)
 
           // Determine extension
           let extension = 'jpg'
-          const contentType = imageResponse.headers.get('content-type') || 'image/jpeg'
+          const contentType = imageResponse.contentType
           if (contentType.includes('png')) extension = 'png'
           else if (contentType.includes('webp')) extension = 'webp'
           else if (contentType.includes('gif')) extension = 'gif'
@@ -1915,24 +1958,23 @@ export async function POST(req: Request) {
           }
 
           // Upload optimized image
-          finalImageUrl = await uploadOptimizedImage(supabase, imageBuffer, data.id, extension)
+          finalImageUrl = await uploadOptimizedImage(supabase, imageBuffer, data.id, extension, contentType)
 
           if (finalImageUrl) {
             const { error: updateError } = await supabase
               .from('recipes')
-              .update({ image_url: finalImageUrl })
+              .update({ image_path: finalImageUrl })
               .eq('id', data.id)
 
             if (!updateError) {
-              data.image_url = finalImageUrl
+              data.image_path = finalImageUrl
+              data.image_url = await createSignedRecipeImageUrl(supabase, finalImageUrl)
             } else {
               console.error('Error updating recipe with image URL:', updateError)
             }
           } else {
             console.error('Failed to upload optimized image')
           }
-        } else {
-          console.error(`Failed to fetch image from URL: ${imageResponse.status} ${imageResponse.statusText}`)
         }
       } catch (imageError) {
         console.error('Error processing extracted image URL:', imageError)
@@ -1949,16 +1991,17 @@ export async function POST(req: Request) {
         }
 
         // Upload optimized image (this will compress and delete original)
-        finalImageUrl = await uploadOptimizedImage(supabase, imageBuffer, data.id, extension)
+        finalImageUrl = await uploadOptimizedImage(supabase, imageBuffer, data.id, extension, imageFile?.type)
 
         if (finalImageUrl) {
           const { error: updateError } = await supabase
             .from('recipes')
-            .update({ image_url: finalImageUrl })
+            .update({ image_path: finalImageUrl })
             .eq('id', data.id)
 
           if (!updateError) {
-            data.image_url = finalImageUrl
+            data.image_path = finalImageUrl
+            data.image_url = await createSignedRecipeImageUrl(supabase, finalImageUrl)
           }
         }
       } catch (imageError) {
@@ -1968,15 +2011,12 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      { success: true, data },
+      { success: true, data: await toRecipeResponse(supabase, data as Record<string, unknown>) },
       { status: 201 }
     )
 
   } catch (error) {
     console.error('Unexpected error:', error)
-    return NextResponse.json(
-      { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next"
+import { getSecurityHeaders } from './src/lib/securityHeaders'
 
 const supabaseHostname = (() => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -10,6 +11,8 @@ const supabaseHostname = (() => {
   }
 })()
 
+const isDevelopment = process.env.NODE_ENV !== 'production'
+
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
@@ -18,7 +21,7 @@ const nextConfig: NextConfig = {
             {
               protocol: 'https' as const,
               hostname: supabaseHostname,
-              pathname: '/storage/v1/object/public/**',
+              pathname: '/storage/v1/object/sign/recipe-images/**',
             },
           ]
         : []),
@@ -28,6 +31,14 @@ const nextConfig: NextConfig = {
   },
   turbopack: {
     root: process.cwd(),
+  },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: getSecurityHeaders(isDevelopment),
+      },
+    ]
   },
 }
 

@@ -1,4 +1,6 @@
 import OpenAI from "openai";
+import { IMAGE_RECIPE_JSON_SCHEMA, imageRecipeOutputSchema } from './aiSchemas';
+import { validateUploadedImage } from './imageValidation';
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -15,28 +17,8 @@ export type ParsedRecipe = {
   image_url?: string | null;
 };
 
-/**
- * Convert File or Buffer to base64 string
- */
-async function fileToBase64(file: File | Buffer): Promise<string> {
-  if (file instanceof File) {
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    return buffer.toString("base64");
-  } else {
-    return file.toString("base64");
-  }
-}
-
-/**
- * Get MIME type from File or infer from Buffer
- */
-function getMimeType(file: File | Buffer): string {
-  if (file instanceof File) {
-    return file.type || "image/jpeg";
-  }
-  // For Buffer, default to JPEG (most common)
-  return "image/jpeg";
+function isFileInput(file: File | Buffer): file is File {
+  return typeof File !== 'undefined' && file instanceof File
 }
 
 /**
@@ -167,9 +149,12 @@ function postProcessRecipe(raw: RawRecipe): ParsedRecipe {
 export async function parseImageRecipe(
   file: File | Buffer
 ): Promise<ParsedRecipe> {
+  const inputBuffer = isFileInput(file) ? Buffer.from(await file.arrayBuffer()) : file
+  const imageInfo = await validateUploadedImage(inputBuffer)
+
   // Convert image to base64
-  const base64Image = await fileToBase64(file);
-  const mimeType = getMimeType(file);
+  const base64Image = inputBuffer.toString("base64");
+  const mimeType = imageInfo.mimeType;
 
   // Strict system prompt for JSON extraction
   const systemPrompt = `You extract structured recipes from images. Return pure JSON:
@@ -222,7 +207,10 @@ Return ONLY the JSON object, nothing else.`;
       ],
       temperature: 0.1, // Low temperature for consistent extraction
       max_tokens: 2000, // Enough for full recipe
-      response_format: { type: "json_object" }, // Force JSON response
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'image_recipe_extraction', strict: true, schema: IMAGE_RECIPE_JSON_SCHEMA },
+      },
     });
 
     const content = response.choices[0]?.message?.content;
@@ -250,8 +238,8 @@ Return ONLY the JSON object, nothing else.`;
       }
     }
 
-    // Post-process and return
-    return postProcessRecipe(parsed as RawRecipe);
+    const validated = imageRecipeOutputSchema.parse(parsed)
+    return postProcessRecipe(validated);
   } catch (error) {
     console.error("Error parsing image recipe:", error);
     throw new Error(

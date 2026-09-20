@@ -21,7 +21,7 @@ export default function StarRating({ recipeId, initialRating }: StarRatingProps)
   // Fetch rating data on mount and when user changes
   useEffect(() => {
     async function fetchRatings() {
-      if (!user?.id) {
+      if (!user) {
         // If not logged in, just show average rating
         setAverageRating(initialRating)
         setIsLoading(false)
@@ -29,7 +29,7 @@ export default function StarRating({ recipeId, initialRating }: StarRatingProps)
       }
 
       try {
-        const res = await fetch(`/api/recipes/${recipeId}/ratings?userId=${user.id}`)
+        const res = await fetch(`/api/recipes/${recipeId}/ratings`)
         const data = await res.json()
 
         if (res.ok && data.success) {
@@ -48,11 +48,11 @@ export default function StarRating({ recipeId, initialRating }: StarRatingProps)
     }
 
     fetchRatings()
-  }, [recipeId, user?.id, initialRating])
+  }, [recipeId, user, initialRating])
 
   const handleStarClick = async (selectedRating: number) => {
-    if (isUpdating || !user?.id) {
-      if (!user?.id) {
+    if (isUpdating || !user) {
+      if (!user) {
         alert('Please log in to rate recipes')
       }
       return
@@ -67,10 +67,7 @@ export default function StarRating({ recipeId, initialRating }: StarRatingProps)
       const res = await fetch(`/api/recipes/${recipeId}/ratings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          rating: selectedRating,
-        }),
+        body: JSON.stringify({ rating: selectedRating }),
       })
 
       const data = await res.json()
@@ -155,4 +152,3 @@ export default function StarRating({ recipeId, initialRating }: StarRatingProps)
     </div>
   )
 }
-

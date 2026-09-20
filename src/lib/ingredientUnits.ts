@@ -671,6 +671,7 @@ async function getDefaultAiProvider(): Promise<AiConversionProvider | null> {
     }
 
     const { aiComplete } = await import('./ai')
+    const { CONVERSION_JSON_SCHEMA, conversionOutputSchema } = await import('./aiSchemas')
 
     const provider: AiConversionProvider = async (input) => {
       const systemPrompt =
@@ -690,19 +691,17 @@ Respond with: {"metricUnit":"g","valuePerUnit":30}`
         {
           temperature: 0,
           max_tokens: 200,
-          response_format: { type: 'json_object' },
+          response_format: {
+            type: 'json_schema',
+            json_schema: { name: 'metric_conversion', strict: true, schema: CONVERSION_JSON_SCHEMA },
+          },
         }
       )
 
       try {
-        const parsed = JSON.parse(response)
-        const unit =
-          parsed.metricUnit === 'g' ? 'g' : parsed.metricUnit === 'ml' ? 'ml' : null
-        const value = Number(parsed.valuePerUnit)
-
-        if (!unit || !Number.isFinite(value) || value <= 0) {
-          return null
-        }
+        const parsed = conversionOutputSchema.parse(JSON.parse(response))
+        const unit = parsed.metricUnit
+        const value = parsed.valuePerUnit
 
         return {
           metricUnit: unit,
@@ -720,4 +719,3 @@ Respond with: {"metricUnit":"g","valuePerUnit":30}`
 
   return defaultAiProviderPromise
 }
-

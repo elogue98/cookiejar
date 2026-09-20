@@ -1,7 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { notFound } from 'next/navigation'
 
 import { Trainer } from './Trainer'
+import { isTrainingEnabled } from '@/lib/trainingAvailability'
 
 const DATASET_DIR = path.join(process.cwd(), 'data/ingredient_highlights')
 
@@ -24,6 +26,8 @@ function loadDatasetSummaries(): DatasetSummary[] {
 }
 
 export default function HighlightTrainingPage() {
+  if (!isTrainingEnabled()) notFound()
+
   const datasets = loadDatasetSummaries()
   return (
     <main className="mx-auto max-w-6xl px-6 py-8">

@@ -3,7 +3,7 @@
 Use this checklist to get a production URL you can share with your family.
 
 ## 1. Prerequisites
-- Node.js 18+ (`node -v`) and npm 10+
+- Node.js 20.18.1+ (`node -v`) and npm 10+
 - A Vercel account with the CLI installed (`npm i -g vercel`) or access to the dashboard
 - Supabase (and OpenAI) credentials handy
 
@@ -14,8 +14,9 @@ Use this checklist to get a production URL you can share with your family.
    ```
 2. Required keys (same list goes into Vercel):
    - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or the legacy anon key)
    - `SUPABASE_SERVICE_ROLE_KEY`
+   - `NEXT_PUBLIC_APP_URL`
    - `OPENAI_API_KEY`
    - `OPENAI_MODEL` (default: `gpt-4o-mini`)
    - `OPENAI_MODEL_FALLBACK` (default: `gpt-4o`)
@@ -25,7 +26,7 @@ Use this checklist to get a production URL you can share with your family.
 ## 3. Verify the app locally
 ```bash
 npm install
-npm run lint   # expect known legacy lint warnings, but no new ones
+npm run lint
 npm run build  # should finish without TypeScript errors
 ```
 
@@ -42,8 +43,9 @@ When prompted for the framework, choose **Next.js**. Accept the detected build c
 Either use the dashboard (**Settings → Environment Variables**) or the CLI:
 ```bash
 vercel env add NEXT_PUBLIC_SUPABASE_URL production
-vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production 
+vercel env add NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY production
 vercel env add SUPABASE_SERVICE_ROLE_KEY production 
+vercel env add NEXT_PUBLIC_APP_URL production
 vercel env add OPENAI_API_KEY production 
 vercel env add OPENAI_MODEL production gpt-4o-mini
 vercel env add OPENAI_MODEL_FALLBACK production gpt-4o
@@ -59,10 +61,11 @@ vercel --prod
 Vercel runs `npm install`, `npm run lint`, and `npm run build`. Once completed, it prints the production URL (also visible under the project’s Deployments tab).
 
 ## 7. Smoke test production
-- Log in, switch profiles, and open a recipe
+- Sign in with each invited family account and open a recipe
 - Import a recipe (image + URL) so OpenAI + Supabase storage paths are exercised
 - Create/edit/delete a recipe, then refresh another browser to confirm it propagates
 - Share the `https://<project>.vercel.app` link with your family 🎉
 
 Keep this doc next to the repo so future deploys are one command away.
 
+For the security migration order, account linking, deployment protection, and private-image verification, use [docs/SECURITY_ROLLOUT.md](SECURITY_ROLLOUT.md).

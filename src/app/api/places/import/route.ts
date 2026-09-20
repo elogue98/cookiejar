@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createServerClient } from '@/lib/supabaseClient'
+import { createServerClient } from '@/lib/supabase/server'
+import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
+import { RATE_LIMITS } from '@/lib/rateLimit'
 import {
   deriveTextSearchQuery,
   extractPlaceIdFromUrl,
@@ -8,10 +10,13 @@ import {
   parseLatLngFromUrl,
 } from '@/lib/googlePlaces'
 import { generateTagsForPlace } from '@/lib/placeTagging'
+import { safeFetchRedirect } from '@/lib/safeFetch'
+import { ApiError, apiErrorResponse } from '@/lib/apiErrors'
+import { httpUrlSchema, parseJsonRequest } from '@/lib/validation'
 
 const requestSchema = z.object({
-  url: z.string().url(),
-})
+  url: httpUrlSchema,
+}).strict()
 
 type GoogleTextSearchResult = {
   place_id: string
@@ -55,26 +60,23 @@ function isLikelyPlaceId(value: string | null | undefined): value is string {
 }
 
 export async function POST(req: Request) {
+  const auth = await authenticateApiRequest(req, { stateChanging: true })
+  if (auth.error) return auth.error
+  const profileId = auth.profile!.profileId
+  const rateLimitError = await checkApiRateLimit(profileId, 'places', RATE_LIMITS.places)
+  if (rateLimitError) return rateLimitError
+
   try {
-    const body = await req.json()
-    const parsed = requestSchema.safeParse(body)
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid request payload', debug: parsed.error.flatten() },
-        { status: 400 }
-      )
-    }
-
-    let { url } = parsed.data
+    const { url: parsedUrl } = await parseJsonRequest(req, requestSchema)
+    let url = parsedUrl
     const googleApiKey = process.env.GOOGLE_MAPS_API_KEY
 
     if (!googleApiKey) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Missing GOOGLE_MAPS_API_KEY environment variable',
-          debug: 'Set GOOGLE_MAPS_API_KEY in env (server key with Places enabled)',
+          error: 'Place import is temporarily unavailable',
+          code: 'GOOGLE_NOT_CONFIGURED',
         },
         { status: 500 }
       )
@@ -124,13 +126,7 @@ export async function POST(req: Request) {
           success: false,
           error:
             'Unable to resolve a Google place_id from that URL. Try sharing the full Google Maps place link (not a short maps.app.goo.gl redirect).',
-          google_status: 'NO_PLACE_ID',
-          google_error: null,
-          debug: {
-            url,
-            textQuery,
-            placeIdFromUrl,
-          },
+          code: 'PLACE_NOT_FOUND',
         },
         { status: 400 }
       )
@@ -183,24 +179,17 @@ export async function POST(req: Request) {
     }
 
     if (!placeDetails.place) {
-      const detail =
-        placeDetails.status === 'REQUEST_DENIED'
-          ? 'Google API key rejected the request (check key type, restrictions, billing, and Places API enablement).'
-          : placeDetails.errorMessage || 'Failed to fetch place details from Google Maps'
-
       return NextResponse.json(
         {
           success: false,
-          error: detail,
-          google_status: placeDetails.status,
-          google_error: placeDetails.errorMessage ?? null,
-          debug: { place_id: resolvedPlaceId, textQuery },
+          error: 'Could not retrieve place details',
+          code: 'PLACE_LOOKUP_FAILED',
         },
         { status: 502 }
       )
     }
 
-    const supabase = createServerClient()
+    const supabase = await createServerClient()
 
     const aiTags = await generateTagsForPlace({
       name: placeDetails.place.name ?? '',
@@ -227,7 +216,7 @@ export async function POST(req: Request) {
         {
           success: false,
           error: 'Could not save place',
-          debug: upsertError.message ?? 'Supabase upsert failed',
+          code: 'DATABASE_ERROR',
         },
         { status: 500 }
       )
@@ -239,14 +228,7 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     console.error('Unexpected error importing place', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Unexpected server error while importing place',
-        debug: error instanceof Error ? error.message : String(error),
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error instanceof ApiError ? error : new ApiError(500, 'INTERNAL_ERROR', 'Unexpected server error while importing place'))
   }
 }
 
@@ -424,12 +406,8 @@ async function resolvePlaceIdByFindPlace(
 
 async function expandMapsShortLink(url: string): Promise<string | null> {
   try {
-    // Try a HEAD first (lighter), then fall back to GET.
-    const headRes = await fetch(url, { method: 'HEAD', redirect: 'follow' })
-    if (headRes.url && headRes.url !== url) return headRes.url
-
-    const getRes = await fetch(url, { method: 'GET', redirect: 'follow' })
-    if (getRes.ok && getRes.url && getRes.url !== url) return getRes.url
+    const expanded = await safeFetchRedirect(url)
+    if (expanded.url !== url) return expanded.url
   } catch (err) {
     console.error('Failed to expand maps short link', err)
   }
@@ -439,7 +417,7 @@ async function expandMapsShortLink(url: string): Promise<string | null> {
 function isShortMapsUrl(url: string) {
   try {
     const u = new URL(url)
-    return u.hostname.includes('maps.app.goo.gl')
+    return u.hostname.toLowerCase() === 'maps.app.goo.gl'
   } catch {
     return false
   }

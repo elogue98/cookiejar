@@ -1,12 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabaseClient'
+import { createServerClient } from '@/lib/supabase/server'
+import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
+import { RATE_LIMITS } from '@/lib/rateLimit'
 import { generateTagsForRecipe } from '@/lib/aiTagging'
 import { uploadOptimizedImage } from '@/lib/imageOptimization'
 import OpenAI from 'openai'
 import { aiComplete } from '@/lib/ai'
 import { ensureMetadataCompleteness } from '@/lib/metadataCompletion'
-import { z } from 'zod'
+import { validateUploadedImage } from '@/lib/imageValidation'
+import { assertRequestContentLength, assertTextLimit, MAX_AI_TEXT_CHARS, parseFormDataRequest } from '@/lib/validation'
+import { apiErrorResponse } from '@/lib/apiErrors'
+import {
+  RECIPE_EXTRACTION_JSON_SCHEMA,
+  recipeExtractionOutputSchema,
+  type RecipeExtractionOutput,
+} from '@/lib/aiSchemas'
 import {
   normalizeIngredientSections,
   normalizeInstructionSections,
@@ -20,35 +29,7 @@ const openai = new OpenAI({
 /**
  * Zod schema for AI-extracted recipe structure (same as in /api/import/ai)
  */
-const RecipeExtractionSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().optional().nullable(),
-  sourceUrl: z.string().url().optional().nullable(),
-  image: z.string().url().optional().nullable(),
-  servings: z.number().int().positive().optional().nullable(),
-  prepTime: z.string().optional().nullable(),
-  cookTime: z.string().optional().nullable(),
-  totalTime: z.string().optional().nullable(),
-  cuisine: z.string().optional().nullable(),
-  mealType: z.string().optional().nullable(),
-  nutrition: z.object({
-    calories: z.number().int().nonnegative().optional().nullable(),
-    protein: z.number().nonnegative().optional().nullable(),
-    fat: z.number().nonnegative().optional().nullable(),
-    carbs: z.number().nonnegative().optional().nullable(),
-  }).optional().nullable(),
-  ingredientSections: z.array(z.object({
-    section: z.string().optional().nullable(),
-    items: z.array(z.string().min(1)),
-  })).min(1, 'At least one ingredient section is required'),
-  instructionSections: z.array(z.object({
-    section: z.string().optional().nullable(),
-    steps: z.array(z.string().min(1)),
-  })).min(1, 'At least one instruction section is required'),
-  tags: z.array(z.string()).optional().nullable(),
-})
-
-type RecipeExtraction = z.infer<typeof RecipeExtractionSchema>
+type RecipeExtraction = RecipeExtractionOutput
 
 /**
  * Normalize MIME types to what OpenAI expects.
@@ -231,7 +212,10 @@ ${content.substring(0, 8000)}`
     {
       temperature: 0.2,
       max_tokens: 4000,
-      response_format: { type: 'json_object' },
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'recipe_extraction', strict: true, schema: RECIPE_EXTRACTION_JSON_SCHEMA },
+      },
     }
   )
 
@@ -261,7 +245,7 @@ ${content.substring(0, 8000)}`
   // Note: We no longer check for errors here since we allow generating instructions when missing
 
   // Validate with zod schema
-  const validated = RecipeExtractionSchema.parse(parsed)
+  const validated = recipeExtractionOutputSchema.parse(parsed)
 
   // Ensure metadata (servings, times, nutrition) is always populated
   const enriched = await ensureMetadataCompleteness(validated, content)
@@ -307,13 +291,20 @@ function formatInstructionPreview(
  * POST /api/import/image
  */
 export async function POST(req: Request) {
+  const auth = await authenticateApiRequest(req, { stateChanging: true })
+  if (auth.error) return auth.error
+  const profileId = auth.profile!.profileId
+  const rateLimitError = await checkApiRateLimit(profileId, 'imports', RATE_LIMITS.imports)
+  if (rateLimitError) return rateLimitError
+
   try {
-    const formData = await req.formData()
+    assertRequestContentLength(req, 12 * 1024 * 1024)
+    const formData = await parseFormDataRequest(req, 12 * 1024 * 1024)
     const file = formData.get('file') as File | null
 
     if (!file) {
       return NextResponse.json(
-        { success: false, error: 'No file provided' },
+        { success: false, error: 'No file provided', code: 'INVALID_REQUEST' },
         { status: 400 }
       )
     }
@@ -322,17 +313,17 @@ export async function POST(req: Request) {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
     if (!validTypes.includes(file.type)) {
       return NextResponse.json(
-        { success: false, error: 'Invalid file type. Please upload a JPG, PNG, or WEBP image.' },
+        { success: false, error: 'Invalid file type. Please upload a JPG, PNG, or WEBP image.', code: 'INVALID_IMAGE' },
         { status: 400 }
       )
     }
 
-    // Validate file size (max 10MB)
+    // Validate encoded size before buffering and processing.
     const maxSize = 10 * 1024 * 1024 // 10MB
     if (file.size > maxSize) {
       return NextResponse.json(
-        { success: false, error: 'File too large. Maximum size is 10MB.' },
-        { status: 400 }
+        { success: false, error: 'File too large. Maximum size is 10MB.', code: 'PAYLOAD_TOO_LARGE' },
+        { status: 413 }
       )
     }
 
@@ -343,6 +334,16 @@ export async function POST(req: Request) {
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
+    try {
+      await validateUploadedImage(buffer, file.type)
+    } catch (error) {
+      const tooLarge = error instanceof Error && /too large/i.test(error.message)
+      return NextResponse.json(
+        { success: false, error: tooLarge ? 'Image is too large' : 'Invalid image', code: tooLarge ? 'PAYLOAD_TOO_LARGE' : 'INVALID_IMAGE' },
+        { status: tooLarge ? 413 : 400 },
+      )
+    }
+
     // Step 1: Extract OCR text from image
     let ocrText: string
     try {
@@ -350,17 +351,19 @@ export async function POST(req: Request) {
     } catch (error) {
       console.error('Error extracting OCR text from image:', error)
       return NextResponse.json(
-        { success: false, error: `Failed to extract text from image: ${error instanceof Error ? error.message : 'Unknown error'}` },
-        { status: 500 }
+        { success: false, error: 'Could not extract text from image', code: 'OCR_FAILED' },
+        { status: 502 }
       )
     }
 
     if (!ocrText || ocrText.trim().length === 0) {
       return NextResponse.json(
-        { success: false, error: 'No text could be extracted from the image' },
+        { success: false, error: 'No text could be extracted from the image', code: 'OCR_EMPTY' },
         { status: 400 }
       )
     }
+
+    assertTextLimit(ocrText, MAX_AI_TEXT_CHARS)
 
     // Step 2: Extract recipe using AI extractor (same as URL imports)
     let extractedRecipe: RecipeExtraction
@@ -376,8 +379,8 @@ export async function POST(req: Request) {
     } catch (error) {
       console.error('Error extracting recipe with AI:', error)
       return NextResponse.json(
-        { success: false, error: `Failed to extract recipe: ${error instanceof Error ? error.message : 'Unknown error'}` },
-        { status: 500 }
+        { success: false, error: 'Could not extract a recipe from the image', code: 'AI_EXTRACTION_FAILED' },
+        { status: 502 }
       )
     }
 
@@ -426,9 +429,6 @@ export async function POST(req: Request) {
 
   } catch (error) {
     console.error('Unexpected error:', error)
-    return NextResponse.json(
-      { success: false, error: `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}` },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }

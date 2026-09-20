@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useUser } from '@/lib/userContext'
 import type { IngredientGroup, InstructionGroup } from '@/types/recipe'
 
 interface Message {
@@ -50,7 +49,6 @@ function isMutationIntent(message: string): boolean {
 }
 
 export default function CookieBot({ recipeId, recipeTitle, ingredients, instructions, tags }: CookieBotProps) {
-  const { user } = useUser()
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -152,7 +150,6 @@ export default function CookieBot({ recipeId, recipeTitle, ingredients, instruct
             ingredients: mutateData.mutatedRecipe.ingredients, // Structured format should work
             instructions: instructionsForSave,
             tags: mutateData.mutatedRecipe.tags,
-            user_id: user?.id || null, // Pass user_id for version tracking
           }),
         })
 

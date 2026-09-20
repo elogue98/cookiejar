@@ -1,4 +1,5 @@
-import { createServerClient } from './supabaseClient'
+import { createServerClient } from './supabase/server'
+import { requireFamilyProfile } from './auth'
 
 type CommentRow = {
   id: string
@@ -11,7 +12,6 @@ type CommentRow = {
 
 interface AddCommentParams {
   recipe_id: string
-  user_id: string
   message: string
 }
 
@@ -20,17 +20,17 @@ interface AddCommentParams {
  */
 export async function addComment({
   recipe_id,
-  user_id,
   message,
 }: AddCommentParams): Promise<{ success: boolean; data?: CommentRow; error?: string }> {
   try {
-    const supabase = createServerClient()
+    const { profileId } = await requireFamilyProfile()
+    const supabase = await createServerClient()
 
     const { data, error } = await supabase
       .from('comments')
       .insert({
         recipe_id,
-        user_id,
+        user_id: profileId,
         message: message.trim(),
       })
       .select()
@@ -38,7 +38,7 @@ export async function addComment({
 
     if (error) {
       console.error('Error adding comment:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: 'Unable to add comment' }
     }
 
     return { success: true, data: data as CommentRow }
@@ -46,8 +46,7 @@ export async function addComment({
     console.error('Unexpected error adding comment:', error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: 'Unable to add comment',
     }
   }
 }
-

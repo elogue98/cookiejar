@@ -5,6 +5,7 @@ import type { Recipe } from '@/types/recipe'
 import Navigation from '@/app/components/Navigation'
 import RecipeList from '@/app/components/RecipeList'
 import WelcomeLanding from '@/app/components/WelcomeLanding'
+import KitchenLoading from './KitchenLoading'
 
 interface HomePageContentProps {
   recipes: Recipe[]
@@ -23,17 +24,7 @@ export default function HomePageContent({ recipes, errorMessage, errorHint }: Ho
       >
         <Navigation forceTheme="cookie" />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <div 
-            className="rounded-lg p-6 text-center"
-            style={{ 
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border-color)'
-            }}
-          >
-            <p className="font-semibold" style={{ color: 'var(--text-main)' }}>
-              Loading your kitchen...
-            </p>
-          </div>
+          <KitchenLoading />
         </main>
       </div>
     )

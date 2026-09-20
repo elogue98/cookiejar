@@ -1,4 +1,5 @@
 import { aiComplete } from '@/lib/ai'
+import { METADATA_JSON_SCHEMA, metadataOutputSchema } from './aiSchemas'
 
 type IngredientSection = {
   section?: string | null
@@ -187,21 +188,24 @@ ${truncatedContent}`
 }
 
 const parseMetadataResponse = (raw: string): MetadataCompletionResponse | null => {
+  let parsed: unknown
   try {
-    return JSON.parse(raw)
+    parsed = JSON.parse(raw)
   } catch {
     const match =
       raw.match(/```(?:json)?\s*([\s\S]*?)```/) ||
       raw.match(/\{[\s\S]*\}/)
     if (match) {
       try {
-        return JSON.parse(match[1] || match[0])
+        parsed = JSON.parse(match[1] || match[0])
       } catch {
         return null
       }
     }
-    return null
   }
+
+  const validated = metadataOutputSchema.safeParse(parsed)
+  return validated.success ? validated.data : null
 }
 
 export async function ensureMetadataCompleteness<T extends MetadataAwareRecipe>(
@@ -234,7 +238,10 @@ export async function ensureMetadataCompleteness<T extends MetadataAwareRecipe>(
       {
         temperature: 0.1,
         max_tokens: 900,
-        response_format: { type: 'json_object' },
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'recipe_metadata', strict: true, schema: METADATA_JSON_SCHEMA },
+        },
       }
     )
     metadata = response ? parseMetadataResponse(response) : null

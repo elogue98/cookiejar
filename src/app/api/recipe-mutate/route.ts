@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aiComplete } from '@/lib/ai'
-
-interface RequestBody {
-  recipeId: string
-  recipeTitle: string
-  ingredients: { section: string; items: string[] }[] | null
-  instructions: { section: string; steps: string[] }[] | null
-  tags: string[] | null
-  userMessage: string
-  messageHistory: { role: 'user' | 'assistant'; content: string }[]
-}
+import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
+import { apiErrorResponse } from '@/lib/apiErrors'
+import { RATE_LIMITS } from '@/lib/rateLimit'
+import {
+  MUTATED_RECIPE_JSON_SCHEMA,
+  mutatedRecipeSchema,
+  parseJsonBody,
+  parseJsonRequest,
+  recipeMutationRequestSchema,
+} from '@/lib/validation'
 
 function formatRecipeContext(
   title: string,
@@ -59,20 +59,29 @@ function formatRecipeContext(
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await authenticateApiRequest(req, { stateChanging: true })
+  if (auth.error) return auth.error
+  const rateLimitError = await checkApiRateLimit(auth.profile!.profileId, 'assistant', RATE_LIMITS.assistant)
+  if (rateLimitError) return rateLimitError
+
   try {
-    const body: RequestBody = await req.json()
+    const body = await parseJsonRequest(req, recipeMutationRequestSchema)
 
     const { recipeId, recipeTitle, ingredients, instructions, tags, userMessage, messageHistory } = body
 
     if (!recipeId || !recipeTitle || !userMessage) {
       return NextResponse.json(
-        { error: 'Missing required fields: recipeId, recipeTitle, and userMessage' },
+        {
+          success: false,
+          error: 'Missing required fields: recipeId, recipeTitle, and userMessage',
+          code: 'INVALID_REQUEST',
+        },
         { status: 400 }
       )
     }
 
     // Format recipe context
-    const recipeContext = formatRecipeContext(recipeTitle, ingredients, instructions, tags)
+    const recipeContext = formatRecipeContext(recipeTitle, ingredients, instructions, tags ?? null)
 
     // Build system prompt for mutation
     const systemPrompt = `You are CookieBot's mutation engine. Your job is to apply the user's requested changes to the recipe and return ONLY a valid JSON object with the updated recipe.
@@ -117,11 +126,18 @@ Return ONLY the JSON object, nothing else.`
     const response = await aiComplete(messages, {
       temperature: 0.3, // Lower temperature for more consistent structured output
       max_tokens: 2000,
-      response_format: { type: 'json_object' },
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'recipe_mutation',
+          strict: true,
+          schema: MUTATED_RECIPE_JSON_SCHEMA,
+        },
+      },
     })
 
     // Parse the JSON response
-    let mutatedRecipe
+    let mutatedRecipe: unknown
     try {
       mutatedRecipe = JSON.parse(response)
     } catch {
@@ -134,23 +150,13 @@ Return ONLY the JSON object, nothing else.`
       }
     }
 
-    // Validate the structure
-    if (!mutatedRecipe || typeof mutatedRecipe !== 'object') {
-      throw new Error('Invalid mutation response structure')
-    }
+    mutatedRecipe = parseJsonBody(mutatedRecipe, mutatedRecipeSchema)
 
     return NextResponse.json({ 
       success: true,
       mutatedRecipe 
     })
   } catch (error) {
-    console.error('Error in /api/recipe-mutate:', error)
-    return NextResponse.json(
-      { 
-        success: false,
-        error: error instanceof Error ? error.message : 'Internal server error' 
-      },
-      { status: 500 }
-    )
+    return apiErrorResponse(error)
   }
 }

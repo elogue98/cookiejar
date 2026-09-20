@@ -1,0 +1,64 @@
+/* Animation storyboard — one 4800ms loop, no JS timers:
+     0ms  whole cookie settles in
+   720ms  upper-right bite → crumbs fall
+  1488ms  lower-right bite → crumbs fall
+  2256ms  upper-left bite → crumbs fall
+  3024ms  lower-left bite → crumbs fall
+  3792ms  last morsel disappears → crumbs fall
+  4800ms  fresh cookie, repeat
+   Mask cuts are discrete; only the biscuit and crumbs move. */
+.loading {
+  --cookie-cycle: 4800ms;
+  display: flex;
+  min-height: min(48vh, 360px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 16px;
+}
+.illustration { display: grid; justify-items: center; gap: 2px; }
+.cookie { width: 84px; height: 98px; overflow: visible; }
+.biscuit {
+  transform-origin: 48px 48px;
+  animation: munch var(--cookie-cycle) ease-out infinite;
+}
+.bite { opacity: 0; animation-duration: var(--cookie-cycle); animation-timing-function: step-end; animation-iteration-count: infinite; }
+.bite[data-bite='one'] { animation-name: biteOne; }
+.fallingCrumbs[data-bite='one'] { --crumb-delay: 720ms; }
+.bite[data-bite='two'] { animation-name: biteTwo; }
+.fallingCrumbs[data-bite='two'] { --crumb-delay: 1488ms; }
+.bite[data-bite='three'] { animation-name: biteThree; }
+.fallingCrumbs[data-bite='three'] { --crumb-delay: 2256ms; }
+.bite[data-bite='four'] { animation-name: biteFour; }
+.fallingCrumbs[data-bite='four'] { --crumb-delay: 3024ms; }
+.bite[data-bite='five'] { animation-name: biteFive; }
+.fallingCrumbs[data-bite='five'] { --crumb-delay: 3792ms; }
+.fallingCrumbs {
+  opacity: 0;
+  animation: scatter var(--cookie-cycle) ease-out var(--crumb-delay) infinite;
+}
+.label { margin: 0; color: var(--text-muted); font-size: 14px; font-weight: 500; text-align: center; }
+
+@keyframes biteOne { 0%, 100% { opacity: 0; } 15% { opacity: 1; } }
+@keyframes biteTwo { 0%, 100% { opacity: 0; } 31% { opacity: 1; } }
+@keyframes biteThree { 0%, 100% { opacity: 0; } 47% { opacity: 1; } }
+@keyframes biteFour { 0%, 100% { opacity: 0; } 63% { opacity: 1; } }
+@keyframes biteFive { 0%, 100% { opacity: 0; } 79% { opacity: 1; } }
+@keyframes munch {
+  0% { opacity: 0; transform: scale(.98); }
+  8%, 14%, 30%, 46%, 62%, 78%, 100% { opacity: 1; transform: scale(1) rotate(0); }
+  15%, 47% { transform: scale(.985) rotate(-1deg); }
+  31%, 63% { transform: scale(.985) rotate(1deg); }
+  21%, 37%, 53%, 69% { transform: scale(1) rotate(0); }
+}
+@keyframes scatter {
+  0% { opacity: 0; transform: translateY(-3px); }
+  1% { opacity: 1; }
+  12% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 0; transform: translateY(16px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading .biscuit, .loading .bite, .loading .fallingCrumbs { animation: none; }
+  .bite[data-bite='one'] { opacity: 1; }
+}

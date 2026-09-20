@@ -476,7 +476,7 @@ export default function PlacesList() {
                                 e.preventDefault()
                                 const val = parseFloat(e.currentTarget.value)
                                 if (!isNaN(val) && val >= 1 && val <= 10) {
-                                  if (!user?.id) {
+                                  if (!user) {
                                     alert('Please log in to rate places')
                                     return
                                   }
@@ -488,10 +488,7 @@ export default function PlacesList() {
                                     const res = await fetch(`/api/places/${place.id}/ratings`, {
                                       method: 'POST',
                                       headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        userId: user.id,
-                                        rating: val,
-                                      }),
+                                      body: JSON.stringify({ rating: val }),
                                     })
                                     const data = await res.json()
                                     if (res.ok && data.success && data.data) {
