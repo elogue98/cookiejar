@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import Navigation from '@/app/components/Navigation'
 import type { IngredientGroup, InstructionGroup } from '@/types/recipe'
+import { parseRecipeNotes } from '@/lib/recipeNotes'
 
 export default function StructuredEditPage() {
   const router = useRouter()
@@ -151,7 +152,8 @@ export default function StructuredEditPage() {
         setSourceUrl(data.source_url || '')
 
         // Metadata - read from proper database columns first
-        setDescription(data.notes || '')
+        const parsedNotes = parseRecipeNotes(data.notes)
+        setDescription(parsedNotes.description || '')
         setServings(data.servings?.toString() || '')
         setPrepTime(data.prep_time || '')
         setCookTime(data.cook_time || '')
@@ -160,21 +162,14 @@ export default function StructuredEditPage() {
         setMealType(data.meal_type || '')
 
         // Fallback: try parsing old JSON format from notes if new fields are empty
-        if (!data.servings && !data.prep_time && !data.cook_time && data.notes) {
-          try {
-            const parsed = JSON.parse(data.notes)
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-              if (parsed.description) setDescription(parsed.description)
-              if (parsed.servings) setServings(parsed.servings?.toString())
-              if (parsed.prepTime) setPrepTime(parsed.prepTime)
-              if (parsed.cookTime) setCookTime(parsed.cookTime)
-              if (parsed.totalTime) setTotalTime(parsed.totalTime)
-              if (parsed.cuisine) setCuisine(parsed.cuisine)
-              if (parsed.mealType) setMealType(parsed.mealType)
-            }
-          } catch {
-             // Ignore - not JSON
-          }
+        if (!data.servings && !data.prep_time && !data.cook_time && parsedNotes.legacyMetadata) {
+          const legacy = parsedNotes.legacyMetadata
+          if (typeof legacy.servings === 'number') setServings(legacy.servings.toString())
+          if (typeof legacy.prepTime === 'string') setPrepTime(legacy.prepTime)
+          if (typeof legacy.cookTime === 'string') setCookTime(legacy.cookTime)
+          if (typeof legacy.totalTime === 'string') setTotalTime(legacy.totalTime)
+          if (typeof legacy.cuisine === 'string') setCuisine(legacy.cuisine)
+          if (typeof legacy.mealType === 'string') setMealType(legacy.mealType)
         }
       } catch (err) {
         console.error('Error loading recipe:', err)

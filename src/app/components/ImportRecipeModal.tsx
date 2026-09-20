@@ -17,7 +17,6 @@ interface ExtractedRecipeData {
   ingredients: string[]
   instructions: string
   tags: string[]
-  metadataNotes?: string | null
   imageDataUrl: string
   imageBuffer: string
   imageMimeType: string
@@ -151,7 +150,6 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         instructions: dataToFinalize.instructions,
         tags: dataToFinalize.tags,
         cookbookSource: cookbookSourceOverride,
-        metadataNotes: dataToFinalize.metadataNotes || null,
         imageBuffer: dataToFinalize.imageBuffer,
         imageMimeType: dataToFinalize.imageMimeType,
         ingredientSections: dataToFinalize.ingredientSections,

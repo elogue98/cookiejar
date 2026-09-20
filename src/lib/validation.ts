@@ -210,6 +210,8 @@ export const imageFinalizeRequestSchema = z.object({
   instructions: z.union([z.array(text(2_000)).max(200), text(100_000)]).optional().nullable(),
   tags: z.array(text(50)).max(30).optional().nullable(),
   cookbookSource: text(2_000).nullable().optional(),
+  // Deprecated compatibility input. Older open clients may still send this,
+  // but image finalization intentionally ignores it.
   metadataNotes: text(20_000).nullable().optional(),
   imageBuffer: z.string().min(4).max(MAX_BASE64_IMAGE_CHARS),
   imageMimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),

@@ -16,6 +16,7 @@ import ImportCompletionOverlay from '@/app/components/ImportCompletionOverlay'
 import type { IngredientGroup, InstructionGroup, Recipe } from '@/types/recipe'
 import { formatRecipeTime } from '@/lib/recipeTime'
 import { createSignedRecipeImageUrl } from '@/lib/imageUrls'
+import { parseRecipeNotes } from '@/lib/recipeNotes'
 
 // Helper functions
 function getDomain(url: string): string {
@@ -83,6 +84,10 @@ function cleanNullableText(value?: string | null): string | undefined {
   const normalized = trimmed.toLowerCase()
   if (normalized === 'null' || normalized === 'undefined' || normalized === 'n/a') return undefined
   return trimmed
+}
+
+function legacyNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 function isSectionHeader(text: string): boolean {
@@ -311,6 +316,8 @@ let normalizedInstructions: InstructionGroup[] | null = null
   expected_matches: recipe.expected_matches || null,
 }
 
+  const parsedNotes = parseRecipeNotes(recipeData.notes)
+
   // Build metadata from database columns first, fallback to JSON parsing
   let metadata: {
     description?: string
@@ -334,7 +341,7 @@ let normalizedInstructions: InstructionGroup[] | null = null
 
   if (hasMetadata) {
     metadata = {
-      description: cleanNullableText(recipe.notes),
+      description: parsedNotes.description,
       servings: recipe.servings || undefined,
       prepTime: cleanNullableText(recipe.prep_time),
       cookTime: cleanNullableText(recipe.cook_time),
@@ -352,19 +359,31 @@ let normalizedInstructions: InstructionGroup[] | null = null
         carbs: recipe.carbs_grams || undefined,
       }
     }
-  } else if (recipeData.notes && typeof recipeData.notes === 'string') {
-    // Fallback: try parsing old JSON format from notes
-    try {
-      const parsed = JSON.parse(recipeData.notes)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        metadata = parsed
-      }
-    } catch {
-      // Not JSON, treat notes as description
-      metadata = {
-        description: cleanNullableText(recipeData.notes)
-      }
+  } else if (parsedNotes.legacyMetadata) {
+    const legacy = parsedNotes.legacyMetadata
+    const legacyNutrition = legacy.nutrition && typeof legacy.nutrition === 'object' && !Array.isArray(legacy.nutrition)
+      ? legacy.nutrition as Record<string, unknown>
+      : null
+
+    metadata = {
+      description: parsedNotes.description,
+      servings: legacyNumber(legacy.servings),
+      prepTime: cleanNullableText(typeof legacy.prepTime === 'string' ? legacy.prepTime : null),
+      cookTime: cleanNullableText(typeof legacy.cookTime === 'string' ? legacy.cookTime : null),
+      totalTime: cleanNullableText(typeof legacy.totalTime === 'string' ? legacy.totalTime : null),
+      cuisine: cleanNullableText(typeof legacy.cuisine === 'string' ? legacy.cuisine : null),
+      mealType: cleanNullableText(typeof legacy.mealType === 'string' ? legacy.mealType : null),
+      nutrition: legacyNutrition
+        ? {
+            calories: legacyNumber(legacyNutrition.calories),
+            protein: legacyNumber(legacyNutrition.protein),
+            fat: legacyNumber(legacyNutrition.fat),
+            carbs: legacyNumber(legacyNutrition.carbs),
+          }
+        : undefined,
     }
+  } else if (parsedNotes.description) {
+    metadata = { description: parsedNotes.description }
   }
 
   if (metadata) {
@@ -556,13 +575,6 @@ let normalizedInstructions: InstructionGroup[] | null = null
                </div>
              )}
   
-             {/* Description (if no metadata) */}
-             {recipeData.notes && !metadata?.description && (
-               <div className="bg-amber-50 p-6 rounded-xl mb-10 text-amber-900 leading-relaxed">
-                 <h3 className="font-bold mb-2 text-sm uppercase tracking-wider opacity-70">Description</h3>
-                 {recipeData.notes}
-               </div>
-             )}
             </>
           ),
           mainContentBottom: (

@@ -77,7 +77,6 @@ export async function POST(req: Request) {
       instructions,
       tags,
       cookbookSource,
-      metadataNotes,
       imageBuffer,
       imageMimeType,
       ingredientSections,
@@ -174,7 +173,7 @@ export async function POST(req: Request) {
       instructions: normalizedInstructions,
       tags: Array.isArray(tags) ? tags : [],
       cookbooksource: cookbookSource && cookbookSource.trim() ? cookbookSource.trim() : null,
-      notes: description || (metadataNotes && typeof metadataNotes === 'string' && metadataNotes.trim() ? metadataNotes.trim() : null),
+      notes: description?.trim() || null,
       // Metadata fields
       servings: servings || null,
       prep_time: prepTime || null,

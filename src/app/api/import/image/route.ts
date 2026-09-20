@@ -19,7 +19,6 @@ import {
 import {
   normalizeIngredientSections,
   normalizeInstructionSections,
-  formatMetadataForNotes,
 } from '@/lib/recipeFormatting'
 
 const openai = new OpenAI({
@@ -391,7 +390,6 @@ export async function POST(req: Request) {
     const instructionSections = normalizeInstructionSections(extractedRecipe.instructionSections)
     const ingredients = flattenIngredientPreview(ingredientSections)
     const instructions = formatInstructionPreview(instructionSections)
-    const metadataNotes = formatMetadataForNotes(extractedRecipe)
     const tags = extractedRecipe.tags || []
 
     // Convert image buffer to base64 for preview
@@ -407,7 +405,6 @@ export async function POST(req: Request) {
           ingredients,
           instructions: instructions || 'No instructions found',
           tags,
-          metadataNotes, // Include metadata JSON string (legacy)
           imageDataUrl: imageDataUrl,
           imageBuffer: base64Image,
           imageMimeType: normalizedMimeType,
