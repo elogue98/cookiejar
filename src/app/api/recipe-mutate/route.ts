@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { aiComplete } from '@/lib/ai'
+import { completeCookieBot } from '@/lib/cookieBotAI'
 import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
-import { apiErrorResponse } from '@/lib/apiErrors'
+import { ApiError, apiErrorResponse } from '@/lib/apiErrors'
 import { RATE_LIMITS } from '@/lib/rateLimit'
 import {
   MUTATED_RECIPE_JSON_SCHEMA,
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await parseJsonRequest(req, recipeMutationRequestSchema)
 
-    const { recipeId, recipeTitle, ingredients, instructions, tags, userMessage, messageHistory } = body
+    const { recipeId, recipeTitle, ingredients, instructions, tags, servings, userMessage, messageHistory } = body
 
     if (!recipeId || !recipeTitle || !userMessage) {
       return NextResponse.json(
@@ -91,6 +91,7 @@ CRITICAL RULES:
 2. The JSON must match this exact structure:
 {
   "title": "Recipe Title",
+  "servings": 4,
   "ingredients": [
     { "section": "Section Name (or empty string)", "items": ["ingredient 1", "ingredient 2"] }
   ],
@@ -106,6 +107,9 @@ CRITICAL RULES:
 6. If the user says "halve this recipe", divide all quantities by 2
 7. If the user says "make this gluten-free", replace gluten-containing ingredients with gluten-free alternatives
 8. Keep the same number of sections and structure unless explicitly asked to change
+9. Update servings consistently when adjusting quantities. Keep the existing servings otherwise; if unknown, use null.
+
+CURRENT SERVINGS: ${servings ?? "Not specified"}
 
 RECIPE CONTEXT:
 ${recipeContext}
@@ -123,18 +127,7 @@ Return ONLY the JSON object, nothing else.`
     ]
 
     // Call OpenAI to generate mutation
-    const response = await aiComplete(messages, {
-      temperature: 0.3, // Lower temperature for more consistent structured output
-      max_tokens: 2000,
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'recipe_mutation',
-          strict: true,
-          schema: MUTATED_RECIPE_JSON_SCHEMA,
-        },
-      },
-    })
+    const response = await completeCookieBot(messages, MUTATED_RECIPE_JSON_SCHEMA, req.signal)
 
     // Parse the JSON response
     let mutatedRecipe: unknown
@@ -157,6 +150,6 @@ Return ONLY the JSON object, nothing else.`
       mutatedRecipe 
     })
   } catch (error) {
-    return apiErrorResponse(error)
+    return apiErrorResponse(error instanceof ApiError ? error : new ApiError(502, 'PROPOSAL_UNAVAILABLE', 'Could not prepare the recipe changes. Please try again.'))
   }
 }

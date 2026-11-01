@@ -11,9 +11,15 @@ export async function GET() {
       .from('users')
       .select('id, name, avatar_url')
       .eq('id', profileId)
-      .single()
+      .maybeSingle()
 
-    if (error || !data) {
+    if (error) {
+      return NextResponse.json(
+        { success: false, error: 'Profile temporarily unavailable', code: 'PROFILE_UNAVAILABLE' },
+        { status: 500, headers: { 'Cache-Control': 'no-store' } },
+      )
+    }
+    if (!data) {
       return NextResponse.json(
         { success: false, error: 'Profile unavailable', code: 'PROFILE_UNAVAILABLE' },
         { status: 403 },

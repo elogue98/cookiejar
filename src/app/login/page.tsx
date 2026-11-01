@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 
 import Logo from '../components/Logo'
 import { supabase } from '@/lib/supabase/browser'
+import { sendSignInLink } from '@/lib/signInLink'
 import { useUser } from '@/lib/userContext'
 
 export default function LoginPage() {
@@ -23,7 +24,7 @@ export default function LoginPage() {
   })
 
   useEffect(() => {
-    if (user) router.replace('/')
+    if (user && !new URLSearchParams(window.location.search).has('error')) router.replace('/')
   }, [user, router])
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -32,16 +33,14 @@ export default function LoginPage() {
     setError(null)
     setMessage(null)
 
-    const { error: signInError } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        shouldCreateUser: false,
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback`,
-      },
-    })
+    const signInError = await sendSignInLink(
+      supabase.auth,
+      email,
+      `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback`,
+    )
 
     if (signInError) {
-      setError('We could not send a sign-in link. Check the email and try again.')
+      setError(signInError)
     } else {
       setMessage('Check your email for a secure sign-in link.')
     }

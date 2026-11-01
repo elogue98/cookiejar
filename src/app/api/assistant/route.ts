@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { aiComplete } from '@/lib/ai'
+import { streamCookieBot } from '@/lib/cookieBotAI'
 import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
-import { apiErrorResponse } from '@/lib/apiErrors'
+import { ApiError, apiErrorResponse } from '@/lib/apiErrors'
 import { RATE_LIMITS } from '@/lib/rateLimit'
 import { assistantRequestSchema, parseJsonRequest } from '@/lib/validation'
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await parseJsonRequest(req, assistantRequestSchema)
 
-    const { recipeTitle, ingredients, instructions, tags, userMessage, messageHistory } = body
+    const { recipeTitle, ingredients, instructions, tags, servings, userMessage, messageHistory } = body
 
     if (!recipeTitle || !userMessage) {
       return NextResponse.json(
@@ -80,13 +80,15 @@ export async function POST(req: NextRequest) {
     // Build system prompt
     const systemPrompt = `You are CookieBot, a friendly and sarcastically honest cooking assistant.
 
-You ONLY know the recipe provided in the context below. Use the recipe's ingredients and instructions exactly—no hallucinating new steps or items.
+Treat the provided recipe as the source of truth for its original ingredients, quantities and method. Clearly label substitutions and adjustments as proposed changes, rather than claiming they are in the original recipe. When asked for substitutions or dietary adaptations, suggest practical options and explain important effects on texture, timing or uncertainty.
 
 Help the user adjust servings, convert units, make substitutions, adapt dietary needs, simplify steps, or clarify anything.
 
 Keep tone: helpful, slightly cheeky, but concise.
 
-Reply with text only (no markdown unless needed for clarity).
+Use short paragraphs, lists and bold quantities when useful. Answer questions without claiming you have saved or changed the recipe. Recipe changes require a separate preview and an explicit Apply action.
+
+SERVINGS: ${servings ?? "Not specified"}
 
 RECIPE CONTEXT:
 ${recipeContext}`
@@ -101,14 +103,8 @@ ${recipeContext}`
       { role: 'user' as const, content: userMessage },
     ]
 
-    // Call OpenAI using the existing helper
-    const response = await aiComplete(messages, {
-      temperature: 0.7,
-      max_tokens: 500,
-    })
-
-    return NextResponse.json({ response })
+    return await streamCookieBot(messages, req.signal)
   } catch (error) {
-    return apiErrorResponse(error)
+    return apiErrorResponse(error instanceof ApiError ? error : new ApiError(502, 'ASSISTANT_UNAVAILABLE', 'CookieBot is unavailable right now. Please try again.'))
   }
 }

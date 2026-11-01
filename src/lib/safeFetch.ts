@@ -202,17 +202,24 @@ async function fetchSafeBytes(
   rawUrl: string,
   allowedTypes: Set<string>,
   maxBytes: number,
+  options: { headers?: Record<string, string>; timeoutMs?: number } = {},
 ): Promise<{ url: string; contentType: string; bytes: Uint8Array }> {
   let currentUrl = (await validateRemoteUrl(rawUrl)).href
 
   for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? REQUEST_TIMEOUT_MS)
     try {
+      const requestUrl = new URL(currentUrl)
+      // Waitrose recipe pages time out for the link-expanding bot but serve
+      // their HTML (including Recipe JSON-LD) to a browser user-agent.
+      const isWaitroseRecipe = allowedTypes === htmlContentTypes &&
+        (requestUrl.hostname === 'www.waitrose.com' || requestUrl.hostname === 'waitrose.com') &&
+        requestUrl.pathname.startsWith('/ecom/recipe/')
       const response = await fetch(currentUrl, {
         redirect: 'manual',
         signal: controller.signal,
-        headers: { 'User-Agent': REMOTE_FETCH_USER_AGENT },
+        headers: { 'User-Agent': isWaitroseRecipe ? 'Mozilla/5.0' : REMOTE_FETCH_USER_AGENT, ...options.headers },
       })
       if (redirectStatuses.has(response.status)) {
         const location = response.headers.get('location')
@@ -225,7 +232,7 @@ async function fetchSafeBytes(
 
       if (!response.ok) {
         await cancelResponseBody(response)
-        throw new SafeFetchError('Remote response unavailable')
+        throw new SafeFetchError(`Remote response unavailable (HTTP ${response.status})`)
       }
       const contentType = (response.headers.get('content-type') || '').split(';', 1)[0].trim().toLowerCase()
       if (!allowedTypes.has(contentType)) {
@@ -277,7 +284,7 @@ export async function safeFetchRedirect(rawUrl: string): Promise<{ url: string }
     }
 
     await cancelResponseBody(response)
-    if (!response.ok) throw new SafeFetchError('Remote response unavailable')
+    if (!response.ok) throw new SafeFetchError(`Remote response unavailable (HTTP ${response.status})`)
     if (response.url && response.url !== currentUrl) {
       currentUrl = (await validateRemoteUrl(response.url)).href
     }
@@ -288,8 +295,38 @@ export async function safeFetchRedirect(rawUrl: string): Promise<{ url: string }
 }
 
 export async function safeFetchText(rawUrl: string) {
-  const result = await fetchSafeBytes(rawUrl, htmlContentTypes, MAX_HTML_BYTES)
-  return { ...result, text: new TextDecoder().decode(result.bytes) }
+  try {
+    const result = await fetchSafeBytes(rawUrl, htmlContentTypes, MAX_HTML_BYTES)
+    return { ...result, text: new TextDecoder().decode(result.bytes) }
+  } catch (error) {
+    // Waitrose can leave requests from Vercel unanswered. Reader retrieves the
+    // public HTML from another network; never forward credentials or queries.
+    const unavailable = error instanceof SafeFetchError && (
+      error.message === 'Remote request timed out' ||
+      error.message === 'Remote request failed' ||
+      error.message === 'Remote response unavailable (HTTP 403)'
+    )
+    if (!unavailable) throw error
+    const source = new URL(rawUrl)
+    const canUseReader = source.protocol === 'https:' && !source.port &&
+      !source.username && !source.password &&
+      (source.hostname === 'www.waitrose.com' || source.hostname === 'waitrose.com') &&
+      /^\/ecom\/recipe\/[a-z0-9-]+\/?$/.test(source.pathname)
+    if (!canUseReader) throw error
+
+    const publicUrl = `https://www.waitrose.com${source.pathname}`
+    const result = await fetchSafeBytes(
+      `https://r.jina.ai/${publicUrl}`,
+      new Set([...htmlContentTypes, 'text/plain']),
+      MAX_HTML_BYTES,
+      { headers: { 'X-Return-Format': 'html', 'X-Timeout': '20' }, timeoutMs: 30_000 },
+    )
+    const text = new TextDecoder().decode(result.bytes)
+    if (!/^\s*(?:<!doctype html[^>]*>\s*)?<html[\s>]/i.test(text)) {
+      throw new SafeFetchError('Reader did not return HTML')
+    }
+    return { ...result, url: rawUrl, contentType: 'text/html', text }
+  }
 }
 
 export async function safeFetchImage(rawUrl: string) {

@@ -1,256 +1,13 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
 import { authenticateApiRequest, checkApiRateLimit } from '@/lib/apiSecurity'
 import { RATE_LIMITS } from '@/lib/rateLimit'
-import { generateTagsForRecipe } from '@/lib/aiTagging'
-import { uploadOptimizedImage } from '@/lib/imageOptimization'
-import OpenAI from 'openai'
-import { aiComplete } from '@/lib/ai'
-import { ensureMetadataCompleteness } from '@/lib/metadataCompletion'
 import { validateUploadedImage } from '@/lib/imageValidation'
-import { assertRequestContentLength, assertTextLimit, MAX_AI_TEXT_CHARS, parseFormDataRequest } from '@/lib/validation'
-import { apiErrorResponse } from '@/lib/apiErrors'
-import {
-  RECIPE_EXTRACTION_JSON_SCHEMA,
-  recipeExtractionOutputSchema,
-  type RecipeExtractionOutput,
-} from '@/lib/aiSchemas'
-import {
-  normalizeIngredientSections,
-  normalizeInstructionSections,
-} from '@/lib/recipeFormatting'
+import { assertRequestContentLength, parseFormDataRequest } from '@/lib/validation'
+import { apiErrorResponse, ApiError } from '@/lib/apiErrors'
+import { extractImageRecipe } from '@/lib/imageRecipeExtraction'
+import { normalizeIngredientSections, normalizeInstructionSections } from '@/lib/recipeFormatting'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-})
-
-/**
- * Zod schema for AI-extracted recipe structure (same as in /api/import/ai)
- */
-type RecipeExtraction = RecipeExtractionOutput
-
-/**
- * Normalize MIME types to what OpenAI expects.
- * Some devices (especially browsers on iOS) report "image/jpg" which
- * OpenAI rejects with "The string did not match the expected pattern."
- */
-function normalizeMimeType(mimeType: string | undefined | null): string {
-  const type = (mimeType || '').toLowerCase()
-  if (type === 'image/jpg' || type === 'image/pjpeg') return 'image/jpeg'
-  if (type === 'image/png') return 'image/png'
-  if (type === 'image/webp') return 'image/webp'
-  if (type === 'image/jpeg') return 'image/jpeg'
-  // Fallback to jpeg if something unexpected gets through validation
-  return 'image/jpeg'
-}
-
-/**
- * Extract OCR text from image using OpenAI Vision
- */
-async function extractOCRTextFromImage(imageBuffer: Buffer, mimeType: string): Promise<string> {
-  const normalizedMimeType = normalizeMimeType(mimeType)
-  const base64Image = imageBuffer.toString('base64')
-  const dataUrl = `data:${normalizedMimeType};base64,${base64Image}`
-
-  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini'
-  
-  const response = await openai.chat.completions.create({
-    model: model === 'gpt-4o-mini' ? 'gpt-4o-mini' : 'gpt-4o',
-    messages: [
-      {
-        role: 'system',
-        content: 'You are an expert OCR assistant specialized in recipe extraction. Extract all text from the image, preserving structure and formatting. Handle handwritten notes, screenshots, and printed recipes with equal accuracy.',
-      },
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: 'Extract all text from this recipe image. This may be a handwritten note, screenshot, cookbook photo, or printed recipe card. Preserve the structure - include ingredient lists, instructions, nutrition facts, and any other recipe information. Handle messy formatting, unclear handwriting, and mixed layouts intelligently. Return only the extracted text content.',
-          },
-          {
-            type: 'image_url',
-            image_url: {
-              url: dataUrl
-            }
-          }
-        ]
-      }
-    ],
-    temperature: 0.1,
-    max_tokens: 3000, // Increased for longer recipes
-  })
-
-  const content = response.choices[0]?.message?.content
-  if (!content) {
-    throw new Error('No response from OpenAI')
-  }
-
-  return content
-}
-
-/**
- * Extract recipe using AI (same function as in /api/import/ai)
- */
-async function extractRecipeWithAI(content: string, contentType: 'html' | 'text' | 'image_ocr'): Promise<RecipeExtraction> {
-  const systemPrompt = `You are the CookieJar Recipe AI Assistant. Your job is to take a user-submitted recipe (ingredients + instructions + optional metadata) and normalize it into CookieJar's structured format.
-
-### RULES:
-
-1. **NEVER change existing instructions.**
-   - If instructions are present (even if messy or poorly formatted), ONLY clean, reformat, and restructure them.
-   - NEVER remove steps, reorder steps, change quantities mentioned, or alter the content.
-   - Preserve the exact meaning and sequence of what the user provided.
-
-2. **Generate instructions ONLY if they are completely missing or extremely minimal.**
-   - If instructions are missing or very incomplete (e.g., just "bake at 350" with no other steps), generate detailed, comprehensive instructions based on the ingredients and recipe title.
-   - Generated instructions MUST be thorough and step-by-step, not just high-level summaries.
-   - Include all necessary steps: preparation, mixing/combining ingredients, cooking/baking methods, temperatures, times, and finishing steps.
-   - Break down complex steps into clear, actionable instructions (e.g., don't just say "mix the batter" - specify what to mix, in what order, and how).
-   - Use standard cooking techniques and logical steps based on the ingredients provided.
-   - This is the ONLY case where you should generate new content.
-
-3. **NEVER remove quantities, reorder steps, or change values from existing instructions.**
-
-4. **If the user wants changes (e.g., 'use 0.5 tbsp coconut oil'), you MUST:**
-   - Confirm the specific change
-   - Apply ONLY that change to the original recipe
-   - Return the final structured JSON for storage
-
-5. **OUTPUT FORMAT (ALWAYS)**
-{
-  "title": "",
-  "description": "",
-  "ingredientSections": [
-    { "section": "", "items": [] }
-  ],
-  "instructionSections": [
-    { "section": "", "steps": [] }
-  ],
-  "tags": [],
-  "extras": {}
-}
-
-6. **If instructions are messy but present**, rewrite them cleanly while preserving all steps and content exactly as provided.
-
-7. **If the user submits images**, extract OCR → format the extracted text.
-
-8. **Be warm, helpful, and funny, but NEVER change existing recipe content.**
-
-9. **For metadata (CRITICAL)**:
-   - **servings (REQUIRED)**: Extract from "Serves X", "Makes X", etc. If NOT found, estimate based on recipe type (desserts: 8-12, breads: 10-16, mains: 4-6, default: 4)
-   - **prepTime, cookTime, totalTime**: Extract if present
-   - **cuisine, mealType**: Extract if mentioned
-   - **nutrition (MANDATORY)**: Extract from content OR CALCULATE from ingredients. ALWAYS include at minimum calories per serving.
-
-10. **Section headers**: If the only section header is generic like "Instructions", "Ingredients", "Method", leave section empty. Don't include generic headers as step 1 or item 1.
-
-11. **For tags**: Generate tags based on what's actually in the recipe (ingredients, cooking methods mentioned, etc.), but keep them relevant and accurate.
-
-Return ONLY valid JSON, no markdown, no explanations.`
-
-  const userPrompt = contentType === 'image_ocr'
-    ? `Extract the recipe from this OCR text extracted from an image. The text may have formatting issues, handwriting artifacts, or screenshot formatting - be flexible and intelligent in parsing.
-
-Handle:
-- Handwritten notes with messy formatting
-- Screenshots with mixed text layouts
-- Missing or unclear section headers
-- Inconsistent spacing and line breaks
-- Nutrition facts embedded in text (extract macros if present)
-
-IMPORTANT: 
-1. If instructions exist, preserve them exactly (only clean formatting). If instructions are completely missing or extremely minimal, generate detailed, comprehensive step-by-step instructions based on the ingredients - include all preparation, mixing, cooking, and finishing steps with specific details.
-
-2. Extract ALL metadata:
-   - **Servings (REQUIRED)**: CRITICAL - "Makes 1 loaf" → 12 servings (NOT 1!), "Makes 1 cake" → 10 servings (NOT 1!). When recipe makes ONE whole baked good, estimate portions from it. NEVER use 1 serving for breads/cakes/pies!
-   - **Prep time, cook time**: Estimate if not explicitly stated based on recipe complexity (e.g., "mussels in coconut milk" → prep: 10min, cook: 15min)
-   - **Nutrition (MANDATORY - DO NOT SKIP)**: 
-     * FIRST: Look for nutrition facts in the OCR text
-     * SECOND: If NOT found (which is common), YOU MUST CALCULATE from ingredients:
-       - Estimate calories/protein/fat/carbs for EACH ingredient based on quantity
-       - Sum all ingredients
-       - Divide by servings
-       - ALWAYS include at minimum: calories, protein, fat, carbs
-     * This is REQUIRED - do not leave nutrition empty!
-   - Cuisine, meal type if can be inferred from recipe name/ingredients
-
-OCR Text:
-${content.substring(0, 8000)}`
-    : contentType === 'html'
-    ? `Extract the recipe from this HTML content. Focus on the main recipe content and ignore navigation, ads, and other page elements.
-
-IMPORTANT: If instructions exist, preserve them exactly (only clean formatting). If instructions are completely missing or extremely minimal, generate detailed, comprehensive step-by-step instructions based on the ingredients - include all preparation, mixing, cooking, and finishing steps with specific details.
-
-HTML Content:
-${content.substring(0, 8000)}`
-    : `Extract the recipe from this pasted text content. The text may be from any source: copied recipes, handwritten notes converted to text, screenshots, etc.
-
-Handle:
-- Any text format, even if messy or poorly structured
-- Auto-detect sections even if not explicitly labeled
-- Extract nutrition/macros from text if mentioned
-
-IMPORTANT: If instructions exist, preserve them exactly (only clean formatting). If instructions are completely missing or extremely minimal, generate detailed, comprehensive step-by-step instructions based on the ingredients - include all preparation, mixing, cooking, and finishing steps with specific details.
-
-Text Content:
-${content.substring(0, 8000)}`
-
-  const response = await aiComplete(
-    [
-      {
-        role: 'system',
-        content: systemPrompt,
-      },
-      {
-        role: 'user',
-        content: userPrompt,
-      },
-    ],
-    {
-      temperature: 0.2,
-      max_tokens: 4000,
-      response_format: {
-        type: 'json_schema',
-        json_schema: { name: 'recipe_extraction', strict: true, schema: RECIPE_EXTRACTION_JSON_SCHEMA },
-      },
-    }
-  )
-
-  if (!response) {
-    throw new Error('No response from AI')
-  }
-
-  // Parse JSON response
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(response)
-  } catch (parseError) {
-    // Try to extract JSON from markdown code blocks if present
-    const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || 
-                     response.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      try {
-        parsed = JSON.parse(jsonMatch[1] || jsonMatch[0])
-      } catch {
-        throw new Error('Failed to parse JSON from AI response')
-      }
-    } else {
-      throw new Error('No valid JSON found in AI response')
-    }
-  }
-
-  // Note: We no longer check for errors here since we allow generating instructions when missing
-
-  // Validate with zod schema
-  const validated = recipeExtractionOutputSchema.parse(parsed)
-
-  // Ensure metadata (servings, times, nutrition) is always populated
-  const enriched = await ensureMetadataCompleteness(validated, content)
-  
-  return enriched
-}
+export const maxDuration = 300
 
 function flattenIngredientPreview(
   sections: Awaited<ReturnType<typeof normalizeIngredientSections>>
@@ -286,146 +43,59 @@ function formatInstructionPreview(
   return parts.join('\n\n')
 }
 
-/**
- * POST /api/import/image
- */
 export async function POST(req: Request) {
   const auth = await authenticateApiRequest(req, { stateChanging: true })
   if (auth.error) return auth.error
-  const profileId = auth.profile!.profileId
-  const rateLimitError = await checkApiRateLimit(profileId, 'imports', RATE_LIMITS.imports)
+  const rateLimitError = await checkApiRateLimit(auth.profile!.profileId, 'imports', RATE_LIMITS.imports)
   if (rateLimitError) return rateLimitError
 
   try {
-    assertRequestContentLength(req, 12 * 1024 * 1024)
-    const formData = await parseFormDataRequest(req, 12 * 1024 * 1024)
-    const file = formData.get('file') as File | null
-
-    if (!file) {
-      return NextResponse.json(
-        { success: false, error: 'No file provided', code: 'INVALID_REQUEST' },
-        { status: 400 }
-      )
+    const maxBytes = 3_100_000
+    assertRequestContentLength(req, maxBytes)
+    const formData = await parseFormDataRequest(req, maxBytes)
+    const files = formData.getAll('file')
+    if (files.length < 1 || files.length > 6 || files.some(file => !(file instanceof File))) {
+      throw new ApiError(400, 'INVALID_REQUEST', 'Choose between one and six recipe photos.')
     }
-
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-    if (!validTypes.includes(file.type)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid file type. Please upload a JPG, PNG, or WEBP image.', code: 'INVALID_IMAGE' },
-        { status: 400 }
-      )
+    const images: { buffer: Buffer; mimeType: string }[] = []
+    let totalBytes = 0
+    for (const file of files as File[]) {
+      totalBytes += file.size
+      if (totalBytes > 3_000_000) throw new ApiError(413, 'PAYLOAD_TOO_LARGE', 'The photos are too large. Please choose fewer or smaller photos.')
+      if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) {
+        throw new ApiError(400, 'INVALID_IMAGE', 'Please upload JPG, PNG, or WEBP photos.')
+      }
+      const buffer = Buffer.from(await file.arrayBuffer())
+      try {
+        const mimeType = file.type === 'image/jpg' ? 'image/jpeg' : file.type
+        await validateUploadedImage(buffer, mimeType)
+        images.push({ buffer, mimeType })
+      } catch {
+        throw new ApiError(400, 'INVALID_IMAGE', 'One of the photos could not be read. Please choose a valid image.')
+      }
     }
-
-    // Validate encoded size before buffering and processing.
-    const maxSize = 10 * 1024 * 1024 // 10MB
-    if (file.size > maxSize) {
-      return NextResponse.json(
-        { success: false, error: 'File too large. Maximum size is 10MB.', code: 'PAYLOAD_TOO_LARGE' },
-        { status: 413 }
-      )
-    }
-
-    // Normalize MIME type for downstream services (OpenAI expects image/jpeg not image/jpg)
-    const normalizedMimeType = normalizeMimeType(file.type)
-
-    // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
+    let draft
     try {
-      await validateUploadedImage(buffer, file.type)
-    } catch (error) {
-      const tooLarge = error instanceof Error && /too large/i.test(error.message)
-      return NextResponse.json(
-        { success: false, error: tooLarge ? 'Image is too large' : 'Invalid image', code: tooLarge ? 'PAYLOAD_TOO_LARGE' : 'INVALID_IMAGE' },
-        { status: tooLarge ? 413 : 400 },
-      )
+      draft = await extractImageRecipe(images)
+    } catch {
+      // Never log image data, model responses, or private recipe contents.
+      throw new ApiError(502, 'AI_EXTRACTION_FAILED', 'Could not finish reading the recipe. Please try again with clearer or fewer photos.')
     }
-
-    // Step 1: Extract OCR text from image
-    let ocrText: string
-    try {
-      ocrText = await extractOCRTextFromImage(buffer, normalizedMimeType)
-    } catch (error) {
-      console.error('Error extracting OCR text from image:', error)
-      return NextResponse.json(
-        { success: false, error: 'Could not extract text from image', code: 'OCR_FAILED' },
-        { status: 502 }
-      )
-    }
-
-    if (!ocrText || ocrText.trim().length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'No text could be extracted from the image', code: 'OCR_EMPTY' },
-        { status: 400 }
-      )
-    }
-
-    assertTextLimit(ocrText, MAX_AI_TEXT_CHARS)
-
-    // Step 2: Extract recipe using AI extractor (same as URL imports)
-    let extractedRecipe: RecipeExtraction
-    try {
-      extractedRecipe = await extractRecipeWithAI(ocrText, 'image_ocr')
-      console.log('[Image Import] AI extracted recipe metadata:', {
-        servings: extractedRecipe.servings,
-        prepTime: extractedRecipe.prepTime,
-        cookTime: extractedRecipe.cookTime,
-        nutrition: extractedRecipe.nutrition,
-        description: extractedRecipe.description,
-      })
-    } catch (error) {
-      console.error('Error extracting recipe with AI:', error)
-      return NextResponse.json(
-        { success: false, error: 'Could not extract a recipe from the image', code: 'AI_EXTRACTION_FAILED' },
-        { status: 502 }
-      )
-    }
-
-    // Step 3: Normalize sections for preview + later storage
-    const ingredientSections = await normalizeIngredientSections(
-      extractedRecipe.ingredientSections
-    )
-    const instructionSections = normalizeInstructionSections(extractedRecipe.instructionSections)
-    const ingredients = flattenIngredientPreview(ingredientSections)
-    const instructions = formatInstructionPreview(instructionSections)
-    const tags = extractedRecipe.tags || []
-
-    // Convert image buffer to base64 for preview
-    const base64Image = buffer.toString('base64')
-    const imageDataUrl = `data:${normalizedMimeType};base64,${base64Image}`
-
-    // Return extracted data for preview (don't create recipe yet)
-    return NextResponse.json(
-      { 
-        success: true, 
-        data: {
-          title: extractedRecipe.title,
-          ingredients,
-          instructions: instructions || 'No instructions found',
-          tags,
-          imageDataUrl: imageDataUrl,
-          imageBuffer: base64Image,
-          imageMimeType: normalizedMimeType,
-          ingredientSections,
-          instructionSections,
-          // Include structured metadata fields
-          servings: extractedRecipe.servings,
-          prepTime: extractedRecipe.prepTime,
-          cookTime: extractedRecipe.cookTime,
-          totalTime: extractedRecipe.totalTime,
-          cuisine: extractedRecipe.cuisine,
-          mealType: extractedRecipe.mealType,
-          nutrition: extractedRecipe.nutrition,
-          description: extractedRecipe.description,
-        }
-      },
-      { status: 200 }
-    )
-
+    const ingredientSections = await normalizeIngredientSections(draft.ingredientSections, { skipConversions: true })
+    const instructionSections = normalizeInstructionSections(draft.instructionSections)
+    return NextResponse.json({ success: true, data: {
+      ...draft,
+      ingredients: flattenIngredientPreview(ingredientSections),
+      instructions: formatInstructionPreview(instructionSections),
+      tags: draft.tags || [],
+      ingredientSections,
+      instructionSections,
+      sourcePhotoCount: images.length,
+      // Retain only the first photo as the recipe image, sent once for saving.
+      imageBuffer: images[0].buffer.toString('base64'),
+      imageMimeType: images[0].mimeType,
+    } })
   } catch (error) {
-    console.error('Unexpected error:', error)
     return apiErrorResponse(error)
   }
 }

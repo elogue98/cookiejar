@@ -133,3 +133,15 @@ describe('session profile loading', () => {
     session.dispose()
   })
 })
+
+it('keeps the authorized profile and avoids a login redirect on server outages', async () => {
+  const { session, fetchProfile, update, unauthorized } = setup()
+  session.handle('INITIAL_SESSION', 'a')
+  await settle()
+  fetchProfile.mockResolvedValue(new Response(null, { status: 500 }))
+  session.handle('TOKEN_REFRESHED', 'a')
+  await settle()
+  expect(update).toHaveBeenLastCalledWith({ user: profile, isLoading: false })
+  expect(unauthorized).not.toHaveBeenCalled()
+  session.dispose()
+})

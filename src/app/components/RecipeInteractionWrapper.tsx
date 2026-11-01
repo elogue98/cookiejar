@@ -84,6 +84,7 @@ export default function RecipeInteractionWrapper({
   }
 
   let globalStepCounter = 0
+  let displayStepOffset = 0
 
   return (
     <div className="flex flex-col lg:flex-row min-h-[calc(100vh-100px)]">
@@ -146,7 +147,12 @@ export default function RecipeInteractionWrapper({
               {!hasInstructionSections && (
                 <h3 className="text-xl font-bold mb-6 text-slate-800">Instructions</h3>
               )}
-              {normalizedInstructions.map((group, idx) => (
+              {normalizedInstructions.map((group, idx) => {
+                // Sections restart numbering; headerless groups continue the previous count.
+                if (group.section) displayStepOffset = 0
+                const groupOffset = displayStepOffset
+                displayStepOffset += group.steps.length
+                return (
                 <div key={idx}>
                   {group.section && (
                     <h3 className="text-xl font-bold mb-6 text-slate-800">{group.section}</h3>
@@ -173,7 +179,7 @@ export default function RecipeInteractionWrapper({
                                 : 'bg-slate-100 text-slate-500 group-hover:bg-[#D34E4E]/10 group-hover:text-[#D34E4E]'
                             }`}
                           >
-                            {i + 1}
+                            {groupOffset + i + 1}
                           </span>
                           <div
                             className={`text-lg leading-relaxed pt-0.5 border-b border-slate-100 pb-8 group-last:border-0 transition-colors duration-200 ${
@@ -189,7 +195,8 @@ export default function RecipeInteractionWrapper({
                     })}
                   </ol>
                 </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <p className="text-slate-400 italic">No instructions provided.</p>

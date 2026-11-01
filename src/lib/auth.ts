@@ -1,4 +1,5 @@
 import { createServerClient } from './supabase/server'
+import { isTemporaryAuthError } from './authAvailability'
 
 export type FamilyProfile = {
   authUserId: string
@@ -33,7 +34,15 @@ async function signOutQuietly(supabase: Awaited<ReturnType<typeof createServerCl
 
 export async function requireFamilyProfile(): Promise<FamilyProfile> {
   const supabase = await createServerClient()
-  const { data, error } = await supabase.auth.getClaims()
+  const { data, error } = await supabase.auth.getClaims().catch(error => {
+    if (isTemporaryAuthError(error)) {
+      throw new FamilyAuthError('AUTH_CONFIGURATION_ERROR', 500, 'Authentication is temporarily unavailable')
+    }
+    throw error
+  })
+  if (isTemporaryAuthError(error)) {
+    throw new FamilyAuthError('AUTH_CONFIGURATION_ERROR', 500, 'Authentication is temporarily unavailable')
+  }
   const authUserId = data?.claims?.sub
 
   if (error || typeof authUserId !== 'string' || authUserId.length === 0) {

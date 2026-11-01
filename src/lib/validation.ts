@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { ApiError } from './apiErrors'
 import { httpUrlSchema } from './urlValidation'
+import { recipeProposalSchema } from './cookieBotRecipe'
 
 export { httpUrlSchema } from './urlValidation'
 
@@ -79,6 +80,7 @@ const chatMessageSchema = z.object({
 }).strict()
 
 const chatFields = {
+  servings: z.number().positive().max(100_000).nullable().optional(),
   recipeTitle: text(300),
   ingredients: z.array(ingredientGroupSchema).max(100).nullable(),
   instructions: z.array(instructionGroupSchema).max(100).nullable(),
@@ -106,18 +108,14 @@ export const recipeMutationRequestSchema = z.object({
   addRecipeTextBudgetIssue(value, context)
 })
 
-export const mutatedRecipeSchema = z.object({
-  title: text(300).min(1),
-  ingredients: z.array(ingredientGroupSchema).max(100),
-  instructions: z.array(instructionGroupSchema).max(100),
-  tags: z.array(text(50)).max(30),
-}).strict()
+export const mutatedRecipeSchema = recipeProposalSchema
 
 export const MUTATED_RECIPE_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   properties: {
     title: { type: 'string' },
+    servings: { type: ['number', 'null'] },
     ingredients: {
       type: 'array',
       items: {
@@ -144,7 +142,7 @@ export const MUTATED_RECIPE_JSON_SCHEMA = {
     },
     tags: { type: 'array', items: { type: 'string' } },
   },
-  required: ['title', 'ingredients', 'instructions', 'tags'],
+  required: ['title', 'ingredients', 'instructions', 'tags', 'servings'],
 } as const
 
 export const recipeCreateRequestSchema = z.object({
@@ -225,7 +223,14 @@ export const imageFinalizeRequestSchema = z.object({
   mealType: text(200).nullable().optional(),
   nutrition: finalizeNutritionSchema.nullable().optional(),
   description: text(20_000).nullable().optional(),
-}).strict()
+  sourceNotes: z.array(text(1_000).min(1)).max(20).optional(),
+  reviewWarnings: z.array(text(1_000).min(1)).max(20).optional(),
+  reviewAcknowledged: z.boolean().optional(),
+}).strict().superRefine((value, context) => {
+  if (value.reviewWarnings?.length && !value.reviewAcknowledged) {
+    context.addIssue({ code: 'custom', path: ['reviewAcknowledged'], message: 'Please review and acknowledge the import warnings.' })
+  }
+})
 
 export function parseJsonBody<T>(body: unknown, schema: z.ZodType<T>): T {
   const parsed = schema.safeParse(body)
