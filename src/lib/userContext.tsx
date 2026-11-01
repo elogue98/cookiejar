@@ -33,7 +33,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         setIsLoading(state.isLoading)
       },
       unauthorized: () => {
-        if (window.location.pathname !== '/login') window.location.replace('/login')
+        if (!['/login', '/admin/login'].includes(window.location.pathname)) window.location.replace('/login')
       },
     })
     sessionRef.current = session

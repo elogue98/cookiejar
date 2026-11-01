@@ -138,13 +138,13 @@ export async function POST(req: Request) {
     // Normalize ingredients/instructions before storing
     const normalizedIngredients =
       Array.isArray(ingredientSections) && ingredientSections.length > 0
-        ? await normalizeIngredientSections(ingredientSections)
+        ? await normalizeIngredientSections(ingredientSections, { skipConversions: true })
         : await normalizeIngredientSections([
             {
               section: '',
               items: Array.isArray(ingredients) ? ingredients : [],
             },
-          ])
+          ], { skipConversions: true })
 
     const fallbackInstructionSteps =
       typeof instructions === 'string'

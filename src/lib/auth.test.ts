@@ -91,3 +91,11 @@ describe('requireFamilyProfile', () => {
     expect(client.auth.signOut).toHaveBeenCalledOnce()
   })
 })
+
+it('preserves the saved session during a temporary auth outage', async () => {
+  const client = createMockClient()
+  client.auth.getClaims.mockResolvedValue({ data: null, error: { name: 'AuthRetryableFetchError', status: 0, __isAuthError: true } })
+  await expect(requireFamilyProfile()).rejects.toMatchObject({ code: 'AUTH_CONFIGURATION_ERROR', status: 500 })
+  expect(client.auth.signOut).not.toHaveBeenCalled()
+  expect(client.from).not.toHaveBeenCalled()
+})

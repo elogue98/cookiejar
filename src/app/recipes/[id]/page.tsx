@@ -610,11 +610,13 @@ let normalizedInstructions: InstructionGroup[] | null = null
       </RecipeInteractionWrapper>
 
       <CookieBot
+        key={id}
         recipeId={id}
         recipeTitle={recipeData.title}
         ingredients={normalizedIngredients || []}
         instructions={normalizedInstructions || []}
         tags={recipeData.tags}
+        servings={metadata?.servings ?? null}
       />
     </div>
   )

@@ -13,7 +13,7 @@ import {
   formatMetadataForNotes,
 } from '@/lib/recipeFormatting'
 import { generateTagsForRecipe } from '@/lib/aiTagging'
-import { safeFetchImage, safeFetchText } from '@/lib/safeFetch'
+import { SafeFetchError, safeFetchImage, safeFetchText } from '@/lib/safeFetch'
 import { createSignedRecipeImageUrl } from '@/lib/imageUrls'
 import { toRecipeResponse } from '@/lib/recipeResponses'
 import { ApiError, apiErrorResponse } from '@/lib/apiErrors'
@@ -30,11 +30,10 @@ import {
 import { MAX_IMAGE_BYTES, validateUploadedImage } from '@/lib/imageValidation'
 import {
   EXPECTED_MATCHES_JSON_SCHEMA,
-  RECIPE_EXTRACTION_JSON_SCHEMA,
   expectedMatchesOutputSchema,
-  recipeExtractionOutputSchema,
   type RecipeExtractionOutput,
 } from '@/lib/aiSchemas'
+import { RECIPE_IMPORT_JSON_SCHEMA, RECIPE_INTRODUCTION_RULE, recipeImportOutputSchema } from '@/lib/recipeIntroduction'
 import OpenAI from 'openai'
 import * as cheerio from 'cheerio'
 
@@ -1203,6 +1202,8 @@ export async function extractRecipeWithAI(
 ): Promise<RecipeExtraction> {
   const systemPrompt = `You are the CookieJar Recipe AI Assistant. Your job is to take a user-submitted recipe (ingredients + instructions + optional metadata) and normalize it into CookieJar's structured format.
 
+${RECIPE_INTRODUCTION_RULE}
+
 ### RULES:
 
 1. **NEVER change existing instructions.**
@@ -1222,7 +1223,7 @@ export async function extractRecipeWithAI(
    - Include all necessary steps: preparation, mixing/combining ingredients, cooking/baking methods, temperatures, times, and finishing steps.
    - Break down complex steps into clear, actionable instructions (e.g., don't just say "mix the batter" - specify what to mix, in what order, and how).
    - Use standard cooking techniques and logical steps based on the ingredients provided.
-   - This is the ONLY case where you should generate new content.
+   - Apart from the brief recipe introduction required above, this is the ONLY case where you should generate new content.
 
 3. **NEVER remove quantities, reorder steps, or change values from existing instructions.**
 
@@ -1242,7 +1243,7 @@ export async function extractRecipeWithAI(
 Include ALL fields that have values. Omit optional fields if not found. Use null for explicitly empty values.
 {
   "title": "Recipe Title (REQUIRED)",
-  "description": "Recipe description if present, otherwise omit",
+  "description": "Preserve the source introduction, or write a brief factual introduction from the recipe",
   "sourceUrl": "Original URL if provided, otherwise omit",
   "image": "Image URL if found, otherwise omit",
   "servings": 4,
@@ -1291,7 +1292,7 @@ Examples:
 9. **Be warm, helpful, and funny, but NEVER change existing recipe content.**
 
 10. **METADATA EXTRACTION (CRITICAL)**: Extract ALL available metadata from the content:
-   - **description**: Recipe description or summary if present
+   - **description**: REQUIRED - Follow the recipe introduction rule above; never leave it empty.
    - **servings**: REQUIRED - Number of servings/portions the recipe yields:
      * CRITICAL: Understand the difference between "makes" and "serves":
        - "Makes 1 loaf" → 12 servings (slices), NOT 1!
@@ -1502,7 +1503,7 @@ ${content.substring(0, 8000)}`
       max_tokens: 4000, // Enough for full recipe
       response_format: {
         type: 'json_schema',
-        json_schema: { name: 'recipe_extraction', strict: true, schema: RECIPE_EXTRACTION_JSON_SCHEMA },
+        json_schema: { name: 'recipe_extraction', strict: true, schema: RECIPE_IMPORT_JSON_SCHEMA },
       },
     }
   )
@@ -1576,7 +1577,7 @@ ${content.substring(0, 8000)}`
     : parsedWithDefaults
 
   // Validate with zod schema
-  const validated = recipeExtractionOutputSchema.parse(parsedWithStructuredData)
+  const validated = recipeImportOutputSchema.parse(parsedWithStructuredData)
 
   // Ensure metadata completeness (servings, times, nutrition)
   const enriched = await ensureMetadataCompleteness(validated, content)
@@ -1684,6 +1685,9 @@ export async function POST(req: Request) {
           imageUrl = extractedImageUrl
         }
       } catch (error) {
+        console.warn('Recipe source fetch failed', {
+          reason: error instanceof SafeFetchError ? error.message : 'Recipe extraction failed',
+        })
         return NextResponse.json(
           { success: false, error: 'Could not fetch the source URL', code: 'REMOTE_FETCH_FAILED' },
           { status: 502 }

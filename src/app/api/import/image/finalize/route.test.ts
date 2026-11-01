@@ -1,99 +1,45 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-
+import { beforeEach, expect, it, vi } from 'vitest'
+import sharp from 'sharp'
 import { POST } from './route'
 
-const mocks = vi.hoisted(() => ({
-  insert: vi.fn(),
-  uploadOptimizedImage: vi.fn(),
-  validateUploadedImage: vi.fn(),
-}))
-
+const insert = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/apiSecurity', () => ({
-  authenticateApiRequest: vi.fn().mockResolvedValue({
-    profile: { authUserId: 'auth-user', profileId: 'profile-1' },
-    error: null,
-  }),
-  checkApiRateLimit: vi.fn().mockResolvedValue(null),
+  authenticateApiRequest: async () => ({ profile: { profileId: 'u1' } }),
+  checkApiRateLimit: async () => null,
 }))
+vi.mock('@/lib/supabase/server', () => ({ createServerClient: async () => ({ from: () => ({ insert }) }) }))
+vi.mock('@/lib/imageOptimization', () => ({ uploadOptimizedImage: async () => null }))
+vi.mock('@/lib/recipeResponses', () => ({ toRecipeResponse: async (_client: unknown, recipe: unknown) => recipe }))
+beforeEach(() => {
+  vi.clearAllMocks()
+  insert.mockImplementation(data => ({ select: () => ({ single: async () => ({ data: { id: 'r1', ...data }, error: null }) }) }))
+})
 
-vi.mock('@/lib/imageOptimization', () => ({
-  uploadOptimizedImage: mocks.uploadOptimizedImage,
-}))
+it.each([null, 'A family favourite.'])('saves the recipe description without appending import diagnostics: %s', async description => {
+  const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: 'white' } }).png().toBuffer()
+  const response = await POST(new Request('http://localhost/api/import/image/finalize', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: 'Sausages', description,
+      ingredientSections: [{ section: '', items: ['8 sausages'] }],
+      instructionSections: [{ section: '', steps: ['Roast the sausages.'] }],
+      imageBuffer: image.toString('base64'), imageMimeType: 'image/png',
+      sourceNotes: ['Handwritten 250 above 200C.'],
+      reviewWarnings: ['Confirm the temperature before cooking.'], reviewAcknowledged: true,
+    }),
+  }))
+  expect(response.status).toBe(201)
+  expect(insert.mock.calls[0][0].notes).toBe(description)
+  const saved = (await response.json()).data
+  expect(saved.notes).toBe(description)
+  expect(saved.instructions[0].steps).toEqual(['Roast the sausages.'])
+})
 
-vi.mock('@/lib/imageValidation', () => ({
-  validateUploadedImage: mocks.validateUploadedImage,
-}))
-
-vi.mock('@/lib/supabase/server', () => ({
-  createServerClient: vi.fn(),
-}))
-
-describe('POST /api/import/image/finalize', () => {
-  beforeEach(async () => {
-    vi.clearAllMocks()
-    mocks.validateUploadedImage.mockResolvedValue({
-      format: 'png',
-      width: 2,
-      height: 2,
-      mimeType: 'image/png',
-    })
-    mocks.uploadOptimizedImage.mockResolvedValue(null)
-
-    mocks.insert.mockImplementation((payload: Record<string, unknown>) => ({
-      select: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: { id: 'recipe-1', ...payload },
-          error: null,
-        }),
-      }),
-    }))
-
-    const { createServerClient } = await import('@/lib/supabase/server')
-    vi.mocked(createServerClient).mockResolvedValue({
-      from: vi.fn().mockReturnValue({ insert: mocks.insert }),
-    } as never)
-  })
-
-  it('does not persist legacy metadata JSON as recipe notes', async () => {
-    const metadataNotes = JSON.stringify({
-      servings: 8,
-      prepTime: '15 minutes',
-      nutrition: { calories: 180, protein: 3, fat: 7, carbs: 28 },
-    })
-
-    const response = await POST(
-      new Request('https://cookiejar.example/api/import/image/finalize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Origin: 'https://cookiejar.example',
-        },
-        body: JSON.stringify({
-          title: 'Perfect Roasted Vegetables with White Wine',
-          ingredients: ['400g carrots'],
-          instructions: ['Preheat oven to 200°C.'],
-          tags: ['vegetarian'],
-          cookbookSource: null,
-          metadataNotes,
-          imageBuffer: 'AQID',
-          imageMimeType: 'image/png',
-          servings: 8,
-          prepTime: '15 minutes',
-          nutrition: { calories: 180, protein: 3, fat: 7, carbs: 28 },
-          description: null,
-        }),
-      }),
-    )
-
-    expect(response.status).toBe(201)
-    expect(mocks.insert).toHaveBeenCalledWith(expect.objectContaining({
-      notes: null,
-      servings: 8,
-      prep_time: '15 minutes',
-      calories: 180,
-      protein_grams: 3,
-      fat_grams: 7,
-      carbs_grams: 28,
-    }))
-  })
+it('still requires acknowledgement of review warnings before saving', async () => {
+  const response = await POST(new Request('http://localhost/api/import/image/finalize', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'Sausages', imageBuffer: 'AAAA', imageMimeType: 'image/png', reviewWarnings: ['The method is cut off.'] }),
+  }))
+  expect(response.status).toBe(400)
+  expect(insert).not.toHaveBeenCalled()
 })

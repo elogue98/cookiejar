@@ -42,7 +42,9 @@ export async function GET(request: Request) {
   try {
     await requireFamilyProfile()
   } catch (error) {
-    await supabase.auth.signOut({ scope: 'local' })
+    if (error instanceof FamilyAuthError && error.status !== 500) {
+      await supabase.auth.signOut({ scope: 'local' })
+    }
     if (error instanceof FamilyAuthError && error.code === 'PROFILE_NOT_LINKED') {
       return redirectToLogin('not-linked')
     }

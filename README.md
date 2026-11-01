@@ -40,6 +40,29 @@ The Supabase keys power storage/auth, OpenAI is used for recipe imports/tagging,
 
 The service-role key is server-only and must never be exposed to the browser. Complete the database/auth rollout from [docs/SECURITY_ROLLOUT.md](docs/SECURITY_ROLLOUT.md) before removing deployment protection.
 
+## Private password entrance
+
+`/admin/login` is an unlinked, password-only entrance for one existing linked family account. It uses normal Supabase authentication and grants that account's existing access. Set these **server-only** values locally and on the deployment:
+
+```dotenv
+ADMIN_LOGIN_EMAIL=the-existing-account-email
+ADMIN_LOGIN_PROFILE_ID=the-existing-family-profile-uuid
+```
+
+Use Eoin's existing Auth email and the `users.id` linked to it through `user_auth_links`. Do not create another account or store a password in environment variables. The existing rate-limit migration and service-role configuration must be available; otherwise the entrance fails closed. The entrance permits ten attempts per ten minutes and fifty per day across all callers, so repeated guesses can temporarily block it; email login remains available.
+
+To choose the password, sign in as Eoin using an email link once, then visit `/admin/password`. Enter and confirm a password of at least twelve characters (Supabase's configured password policy also applies). Only the configured profile can save a password there. Afterwards, bookmark `/admin/login` and enter just the password. Forgotten passwords can be replaced through the same email-login/setup flow. If Supabase requests recent authentication, obtain a fresh email sign-in before trying setup again.
+
+Neither private URL is linked from normal site navigation; the regular email sign-in remains available. No password is included in source control or logs.
+
+## CookieBot
+
+CookieBot chat and recipe proposals use `gpt-6-luna` through the OpenAI Responses API with reasoning disabled for responsiveness. The optional server-only `COOKIEBOT_MODEL` setting overrides this dedicated model; the existing `OPENAI_MODEL` and `OPENAI_MODEL_FALLBACK` settings continue to control imports and tagging. CookieBot does not silently fall back to another model.
+
+Answers stream as they arrive. Stop cancels generation, interrupted text remains visible, and retry replaces the interrupted turn. Drafts and conversation survive minimising the panel. Recipe edits are generated as previews; only **Apply changes** sends the existing authenticated recipe update request and records recipe history. Preview generation and Cancel do not save the recipe. Serving adjustments include the serving count. Responses are not stored by OpenAI (`store: false`); local chat state lasts for the current recipe page.
+
+Streamdown renders incomplete Markdown with a subtle 160ms word fade while streaming. Completed messages shed animation wrappers; reduced-motion preferences disable the fades. Model-supplied HTML, images and links are excluded from recipe prose.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

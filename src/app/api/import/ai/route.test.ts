@@ -81,6 +81,7 @@ describe('extractStructuredRecipeDataFromHTML', () => {
 
     vi.mocked(aiComplete).mockResolvedValueOnce(JSON.stringify({
       title: 'Orzo with Prawns',
+      description: 'Orzo and prawns with marinated feta.',
       servings: 4,
       prepTime: '15 minutes',
       cookTime: '30 minutes',
@@ -106,5 +107,6 @@ describe('extractStructuredRecipeDataFromHTML', () => {
 
     expect(recipe.ingredientSections).toEqual([{ items: ['200g feta'] }])
     expect(recipe.instructionSections).toEqual([{ steps: ['Mix the feta.'] }])
+    expect(recipe.description).toBe('Orzo and prawns with marinated feta.')
   })
 })

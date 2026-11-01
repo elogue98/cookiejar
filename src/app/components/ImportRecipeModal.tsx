@@ -4,6 +4,9 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import AnimatedModal from './AnimatedModal'
 import LoadingOverlay from './LoadingOverlay'
+import { readImportResponse } from '@/lib/importResponse'
+import { prepareImportImage } from '@/lib/importImage'
+import ImageImportReview from './ImageImportReview'
 
 type ImportMode = 'url' | 'image' | 'text'
 
@@ -17,11 +20,13 @@ interface ExtractedRecipeData {
   ingredients: string[]
   instructions: string
   tags: string[]
-  imageDataUrl: string
   imageBuffer: string
   imageMimeType: string
   ingredientSections: { section: string; items: string[] }[]
   instructionSections: { section: string; steps: string[] }[]
+  sourcePhotoCount: number
+  reviewWarnings: string[]
+  sourceNotes: string[]
   // Metadata fields
   servings?: number | null
   prepTime?: string | null
@@ -43,12 +48,15 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
   const [mode, setMode] = useState<ImportMode>('url')
   const [url, setUrl] = useState('')
   const [text, setText] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
+  const [draft, setDraft] = useState<ExtractedRecipeData | null>(null)
+  const [reviewAcknowledged, setReviewAcknowledged] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [finalizing, setFinalizing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const extractionRequest = useRef<AbortController | null>(null)
 
   const handleUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,7 +79,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         }),
       })
 
-      const data = await res.json()
+      const data = await readImportResponse<{ id: string }>(res)
 
       if (!res.ok || !data.success) {
         setError(data.error || 'Failed to import recipe')
@@ -109,7 +117,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         }),
       })
 
-      const data = await res.json()
+      const data = await readImportResponse<{ id: string }>(res)
 
       if (!res.ok || !data.success) {
         setError(data.error || 'Failed to import recipe')
@@ -131,6 +139,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
     dataToFinalize: ExtractedRecipeData,
     cookbookSourceOverride: string | null = null
   ) => {
+    if (finalizing || (dataToFinalize.reviewWarnings.length > 0 && !reviewAcknowledged)) return
     setFinalizing(true)
     setError(null)
 
@@ -162,9 +171,9 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         mealType: dataToFinalize.mealType,
         nutrition: dataToFinalize.nutrition,
         description: dataToFinalize.description,
+        reviewWarnings: dataToFinalize.reviewWarnings,
+        reviewAcknowledged,
       }
-
-      console.log('[ImportRecipeModal] Sending payload to finalize:', payload)
 
       const res = await fetch('/api/import/image/finalize', {
         method: 'POST',
@@ -172,7 +181,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         body: JSON.stringify(payload),
       })
 
-      const data = await res.json()
+      const data = await readImportResponse<{ id: string }>(res)
 
       if (!res.ok || !data.success) {
         setError(data.error || 'Failed to finalize recipe import')
@@ -180,6 +189,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         return
       }
 
+      resetForm()
       onClose()
       router.push(`/recipes/${data.data.id}?import=review`)
     } catch (err) {
@@ -191,33 +201,41 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
   const handleImageSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!file) {
-      setError('Please select an image')
+    if (!files.length) {
+      setError('Please select one or more recipe photos')
       return
     }
 
     // Validate file type
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-    if (!validTypes.includes(file.type)) {
+    if (files.some(file => !validTypes.includes(file.type))) {
       setError('Please select a valid image file (JPG, PNG, or WEBP)')
       return
     }
 
     setLoading(true)
     setError(null)
+    const controller = new AbortController()
+    extractionRequest.current?.abort()
+    extractionRequest.current = controller
 
     try {
       const formData = new FormData()
-      formData.append('file', file)
+      const perPhotoBudget = Math.min(2_000_000, Math.floor(3_000_000 / files.length))
+      for (const file of files) {
+        const prepared = await prepareImportImage(file, perPhotoBudget)
+        if (controller.signal.aborted) return
+        formData.append('file', prepared)
+      }
 
       const res = await fetch('/api/import/image', {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       })
 
-      const data = await res.json()
-
-      console.log('[ImportRecipeModal] Image extraction response:', data)
+      const data = await readImportResponse<ExtractedRecipeData>(res)
+      if (controller.signal.aborted) return
 
       if (!res.ok || !data.success) {
         console.error('[ImportRecipeModal] Image extraction failed:', data.error)
@@ -227,8 +245,10 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
       }
 
       setLoading(false)
-      await finalizeImageImport(data.data, null)
+      setDraft(data.data)
+      setReviewAcknowledged(false)
     } catch (err) {
+      if (controller.signal.aborted) return
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
       setLoading(false)
     }
@@ -249,42 +269,50 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
     e.stopPropagation()
     setDragActive(false)
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const droppedFile = e.dataTransfer.files[0]
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-      if (validTypes.includes(droppedFile.type)) {
-        setFile(droppedFile)
-        setError(null)
-      } else {
-        setError('Please select a valid image file (JPG, PNG, or WEBP)')
-      }
+    addFiles(Array.from(e.dataTransfer.files))
+  }
+
+  const addFiles = (selected: File[]) => {
+    if (loading || finalizing) return
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    if (selected.some(file => !validTypes.includes(file.type))) {
+      setError('Please select JPG, PNG, or WEBP photos')
+      return
     }
+    const combined = [...files]
+    for (const file of selected) {
+      if (!combined.some(existing => existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified)) combined.push(file)
+    }
+    if (combined.length > 6) {
+      setError('You can import up to six photos of one recipe at a time')
+      return
+    }
+    setFiles(combined)
+    setDraft(null)
+    setReviewAcknowledged(false)
+    setError(null)
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0]
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-      if (validTypes.includes(selectedFile.type)) {
-        setFile(selectedFile)
-        setError(null)
-      } else {
-        setError('Please select a valid image file (JPG, PNG, or WEBP)')
-      }
-    }
+    addFiles(Array.from(e.target.files || []))
+    e.target.value = ''
   }
 
   const resetForm = () => {
     console.log('[ImportRecipeModal] Resetting form')
     setUrl('')
     setText('')
-    setFile(null)
+    extractionRequest.current?.abort()
+    setFiles([])
+    setDraft(null)
+    setReviewAcknowledged(false)
     setError(null)
     setLoading(false)
     setFinalizing(false)
   }
 
   const handleClose = () => {
+    if (finalizing) return
     resetForm()
     onClose()
   }
@@ -295,7 +323,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
 
   return (
     <>
-      {(loading || finalizing) && <LoadingOverlay onCancel={handleCancel} />}
+      {loading && <LoadingOverlay onCancel={handleCancel} />}
       <AnimatedModal
         open={isOpen}
         onClose={handleClose}
@@ -325,15 +353,15 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
               marginBottom: '8px',
             }}
           >
-            Import Recipe
+            {draft ? 'Review extracted recipe' : 'Import Recipe'}
           </h2>
           <p style={{ color: 'rgba(43, 43, 43, 0.7)', fontSize: '14px' }}>
-            Import a recipe from a URL, image, or paste text
+            {draft ? 'Nothing is saved until you choose Save recipe.' : 'Import a recipe from a URL, photos, or paste text'}
           </p>
         </div>
 
         {/* Tabs */}
-        <div
+        {!draft && <div
           style={{
             display: 'flex',
             gap: '8px',
@@ -401,7 +429,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
           >
             Paste Text
           </button>
-        </div>
+        </div>}
 
         {/* URL Form */}
         {mode === 'url' && (
@@ -595,7 +623,19 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
         )}
 
         {/* Image Form - Upload Step */}
-        {mode === 'image' && (
+        {mode === 'image' && draft && (
+          <ImageImportReview
+            draft={draft}
+            photos={files}
+            acknowledged={reviewAcknowledged}
+            onAcknowledge={setReviewAcknowledged}
+            onBack={() => { setDraft(null); setReviewAcknowledged(false); setError(null) }}
+            onSave={() => { void finalizeImageImport(draft) }}
+            saving={finalizing}
+            error={error}
+          />
+        )}
+        {mode === 'image' && !draft && (
           <form onSubmit={handleImageSubmit}>
             <div style={{ marginBottom: '20px' }}>
               <label
@@ -607,7 +647,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
                   marginBottom: '8px',
                 }}
               >
-                Recipe Image
+                Recipe Photos
               </label>
               <div
                 onDragEnter={handleDrag}
@@ -625,33 +665,40 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
                 }}
                 onClick={() => fileInputRef.current?.click()}
               >
-                {file ? (
+                {files.length > 0 ? (
                   <div>
                     <p style={{ color: 'var(--text-main)', marginBottom: '8px', fontWeight: '500' }}>
-                      {file.name}
+                      {files.length} {files.length === 1 ? 'photo' : 'photos'} selected
                     </p>
                     <p style={{ color: 'rgba(43, 43, 43, 0.6)', fontSize: '12px' }}>
-                      Click to change file
+                      Click to add another page
                     </p>
                   </div>
                 ) : (
                   <div>
                     <p style={{ color: 'var(--text-main)', marginBottom: '8px' }}>
-                      Drag and drop an image here, or click to select
+                      Drop recipe photos here, or click to select
                     </p>
                     <p style={{ color: 'rgba(43, 43, 43, 0.6)', fontSize: '12px' }}>
-                      Supports JPG, PNG, and WEBP
+                      JPG, PNG, or WEBP · Up to six photos
                     </p>
                   </div>
                 )}
                 <input
                   ref={fileInputRef}
                   type="file"
+                  multiple
                   accept=".jpg,.jpeg,.png,.webp"
                   onChange={handleFileChange}
                   style={{ display: 'none' }}
                 />
               </div>
+              {files.length > 0 && <ol style={{ marginTop: 12, paddingLeft: 20, listStyle: 'decimal' }}>
+                {files.map((file, index) => <li key={`${file.name}-${index}`} style={{ marginBottom: 8, overflowWrap: 'anywhere' }}>
+                  {file.name}{' '}
+                  <button type="button" aria-label={`Remove photo ${index + 1}`} disabled={loading || finalizing} onClick={() => setFiles(current => current.filter((_, itemIndex) => itemIndex !== index))} style={{ color: '#b43b3b', padding: '4px 8px' }}>Remove</button>
+                </li>)}
+              </ol>}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -667,10 +714,10 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
                   fontWeight: '500',
                 }}
               >
-                Choose Image
+                {files.length ? 'Add Photos' : 'Choose Photos'}
               </button>
               <p style={{ fontSize: '12px', color: 'rgba(43, 43, 43, 0.6)', marginTop: '10px' }}>
-                After processing, you’ll add any cookbook details on the success overlay.
+                Include every page of the same recipe in order. You’ll review the ingredients, method, and any warnings before saving.
               </p>
             </div>
 
@@ -707,19 +754,19 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
               </button>
               <button
                 type="submit"
-                disabled={loading || finalizing || !file}
+                disabled={loading || finalizing || !files.length}
                 style={{
                   padding: '10px 24px',
                   background: '#D34E4E',
                   color: 'white',
                   border: 'none',
                   borderRadius: '14px',
-                  cursor: loading || finalizing || !file ? 'not-allowed' : 'pointer',
-                  opacity: loading || finalizing || !file ? 0.6 : 1,
+                  cursor: loading || finalizing || !files.length ? 'not-allowed' : 'pointer',
+                  opacity: loading || finalizing || !files.length ? 0.6 : 1,
                   fontWeight: '500',
                 }}
               >
-                {loading || finalizing ? 'Processing...' : 'Extract & Import'}
+                {loading || finalizing ? 'Reading photos...' : 'Extract & Review'}
               </button>
             </div>
           </form>
